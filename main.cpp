@@ -57,7 +57,67 @@ void del_from_pfds(std::vector<pollfd> *pfds, int fd, nfds_t *fd_count) {
     (*fd_count) = pfds->size();
 }
 
-//void recieve_netlink_info()
+void process_rtm_newlink(nlmsghdr* nlh) {
+    struct ifinfomsg *ifi = (struct ifinfomsg *) NLMSG_DATA(nlh);
+    struct rtattr *rta = IFLA_RTA(ifi);
+    int rtl = IFLA_PAYLOAD(nlh);
+    while (RTA_OK(rta, rtl)) {
+        if (rta->rta_type == IFLA_IFNAME) {
+            const char* ifname = (char*)(RTA_DATA(rta));
+            bool if_up = (ifi->ifi_flags & IFF_UP);
+            bool if_running = (ifi->ifi_flags & IFF_RUNNING);
+            int ifindex = ifi->ifi_index;
+
+            printf(
+                "ifname: %s, status: %s, i_runnning: %s, ifindex: %i\n",
+                ifname,
+                if_up ? "up" : "down",
+                if_running ? "running" : "stopped",
+                ifindex
+            );
+            //std::cout << "ifindex: " << ifindex << std::endl;
+        }
+        if (rta->rta_type == IFLA_ADDRESS) {
+            const uint8_t* mac_addr = (uint8_t*)RTA_DATA(rta);
+            char buf[18];
+            snprintf(buf, sizeof(buf),
+                     "%02x:%02x:%02x:%02x:%02x:%02x",
+                     mac_addr[0], mac_addr[1], mac_addr[2],
+                     mac_addr[3], mac_addr[4], mac_addr[5]);
+            std::cout << "ip address: " << buf << std::endl;
+        }
+        if (rta->rta_type == IFLA_OPERSTATE) {
+            const char* operstate = (char*)(RTA_DATA(rta));
+            std::cout << "operstate: " << operstate << std::endl;
+        }
+        rta = RTA_NEXT(rta, rtl);
+    }
+
+}
+
+void process_rtm_dellink(nlmsghdr* nlh) {
+    struct ifinfomsg *ifi = (struct ifinfomsg *) NLMSG_DATA(nlh);
+    int ifindex = ifi->ifi_index;
+    printf("interface No.%i deleted\n", ifindex);
+}
+
+void process_rtm_newaddr(nlmsghdr* nlh) {
+    struct ifaddrmsg *ifa = (struct ifaddrmsg *) NLMSG_DATA(nlh);
+    int ifindex = ifa->ifa_index;
+    sa_family_t ifa_family = ifa->ifa_family;
+    std::cout<<"CHECK"<<std::endl;
+    printf("ifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
+    struct rtattr *rta = IFA_RTA(ifa);
+    int rtl = IFA_PAYLOAD(nlh);
+    while (RTA_OK(rta, rtl)) {
+        if (rta->rta_type == IFA_ADDRESS) {
+            char ip[ifa_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
+            inet_ntop(ifa_family,RTA_DATA(rta),ip,sizeof(ip));
+            printf("Interface No.%i ip address: %s addded\n",ifindex,ip);
+        }
+        rta = RTA_NEXT(rta, rtl);
+    }
+}
 
 int main() {
     int ready;
@@ -74,7 +134,7 @@ int main() {
         sa.nl_groups = RTMGRP_LINK |
                        RTMGRP_IPV4_IFADDR |
                        RTMGRP_IPV6_IFADDR;
-        sa.nl_groups = RTMGRP_LINK;
+        //sa.nl_groups = RTMGRP_LINK;
         bind(netlink_fd, (struct sockaddr*)&sa, sizeof(sa));
     } else {
         perror("socket");
@@ -84,12 +144,11 @@ int main() {
     std::cout << "fd_count: " << fd_count << std::endl;
 
     int size;
-    char buffer[4096];
-    struct iovec iov = { buffer, sizeof(buffer) };
-    struct msghdr msg;
-    struct nlmsghdr *nlh;
+    //struct iovec iov = { buffer, sizeof(buffer) };
+    //struct msghdr msg;
+    //struct nlmsghdr *nlh;
 
-    nlh = (struct nlmsghdr*)buffer;
+    //nlh = (struct nlmsghdr*)buffer;
     while (fd_count > 0) {
         ready = poll(pfds.data(), fd_count, -1);
         if (ready == -1)
@@ -100,55 +159,54 @@ int main() {
             if (pfd.revents != 0) {
                 if (pfd.revents & POLLIN) {
                     std::cout << "Read" << std::endl;
+                    char buffer[8192];
+                    struct iovec iov = {buffer,sizeof(buffer)};
+                    struct sockaddr_nl sa;
+                    struct msghdr msg = {&sa,sizeof(sa),&iov,1};
 
-                    while ((size = recv(pfd.fd, nlh, 4096, 0)) > 0) {
-                        std::cout << "size: " << size << std::endl;
-                        while ((NLMSG_OK(nlh, size)) && (nlh->nlmsg_type != NLMSG_DONE)) {
-                            if (nlh->nlmsg_type == RTM_NEWLINK) {
+                    ssize_t len = recvmsg(pfd.fd, &msg, 0);
+                    if (len < 0) {
+                        perror("recvmsg");
+                        return -1;
+                    }
+
+                    /* Kernel messages only */
+                    if (sa.nl_pid != 0)
+                        continue;
+
+                    for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+                        if (nlh->nlmsg_type == NLMSG_DONE)
+                            break;
+
+                        if (nlh->nlmsg_type == NLMSG_ERROR) {
+                            std::cerr << "Netlink error\n";
+                            continue;
+                        }
+
+                        switch (nlh->nlmsg_type) {
+                            case RTM_NEWLINK:
                                 std::cout << "RTM_NEWLINK" << std::endl;
-                                struct ifinfomsg *ifi = (struct ifinfomsg *) NLMSG_DATA(nlh);
-                                struct rtattr *rth = IFLA_RTA(ifi);
-                                int rtl = IFLA_PAYLOAD(nlh);
-
-
-                                while (rtl && RTA_OK(rth, rtl)) {
-                                    if (rth->rta_type == IFLA_IFNAME) {
-                                        std::cout << "IFLA_IFNAME" << std::endl;
-                                        const char* ifname = static_cast<const char*>(RTA_DATA(rth));
-                                        bool if_up = (ifi->ifi_flags & IFF_UP);
-                                        int ifindex = ifi->ifi_index;
-
-                                        printf("ifname: %s, status: %s\n", ifname, if_up ? "up" : "down");
-                                        std::cout << "ifindex: " << ifindex << std::endl;
-                                    }
-                                    /*if (rth->rta_type == IFLA_OPERSTATE) {
-                                        stdifi->ifi_flags
-                                    }*/
-                                    if (rth->rta_type == IFA_LOCAL) {
-                                        char name[IFNAMSIZ];
-                                        if_indextoname(ifi->ifi_index, name);
-                                        char ip[INET_ADDRSTRLEN];
-                                        inet_ntop(AF_INET, RTA_DATA(rth), ip, sizeof(ip));
-                                        printf("interface %s ip: %s\n", name, ip);
-                                    }
-                                    rth = RTA_NEXT(rth, rtl);
-                                }
-                            } else if (nlh->nlmsg_type == RTM_DELLINK) {
+                                process_rtm_newlink(nlh);
+                                break;
+                            case RTM_DELLINK:
                                 std::cout << "RTM_DELLINK" << std::endl;
-                            }
+                                process_rtm_dellink(nlh);
+                                break;
 
-
-                            nlh = NLMSG_NEXT(nlh, size);
+                            case RTM_NEWADDR:
+                                std::cout << "RTM_NEWADDR" << std::endl;
+                                process_rtm_newaddr(nlh);
+                                break;
+                            case RTM_DELADDR:
+                                std::cout << "RTM_DELADDR" << std::endl;
+                                //handle_addr(nh);
+                                break;
                         }
                     }
                 }
             }
         }
-
-
     }
-
-
 }
 
 /*

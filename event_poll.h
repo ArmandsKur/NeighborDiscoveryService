@@ -1,7 +1,3 @@
-//
-// Created by Armands Kurevskis on 23/12/2025.
-//
-
 #ifndef NEIGHBORDISCOVERYSERVICE_EVENT_POLL_H
 #define NEIGHBORDISCOVERYSERVICE_EVENT_POLL_H
 
