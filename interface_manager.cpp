@@ -74,12 +74,55 @@ void InterfaceManager::handle_dellink(struct nlmsghdr *nlh) {
     interface_list.erase(ifindex);
     printf("interface No.%i deleted\n", ifindex);
 }
-void InterfaceManager::handle_newaddr(struct nlmsghdr *nlh) {
 
+void InterfaceManager::add_address(int ifindex, struct ip_address ip_addr) {
+    interface_list[ifindex].ip_addresses.push_back(ip_addr);
+}
+
+void InterfaceManager::delete_address(int ifindex, struct ip_address) {
+    /*
+    * Since on add_address I just push back without checking if it already exists
+    * We have to delete all the same addresses from vector in one go
+    * Probably not needed if RTM_NEWADDR comes only for unexistand addresses
+    */
+}
+
+void InterfaceManager::handle_newaddr(struct nlmsghdr *nlh) {
+    struct ifaddrmsg *ifa = (struct ifaddrmsg *) NLMSG_DATA(nlh);
+    int ifindex = ifa->ifa_index;
+    sa_family_t ifa_family = ifa->ifa_family;
+    std::cout<<"CHECK"<<std::endl;
+    printf("ifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
+    struct rtattr *rta = IFA_RTA(ifa);
+    int rtl = IFA_PAYLOAD(nlh);
+    while (RTA_OK(rta, rtl)) {
+        if (rta->rta_type == IFA_ADDRESS) {
+            char ip[ifa_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
+            inet_ntop(ifa_family,RTA_DATA(rta),ip,sizeof(ip));
+
+            //interface_list[ifindex]
+            printf("Interface No.%i ip address: %s addded\n",ifindex,ip);
+        }
+        rta = RTA_NEXT(rta, rtl);
+    }
 }
 
 void InterfaceManager::handle_deladdr(struct nlmsghdr *nlh) {
-
+    struct ifaddrmsg *ifa = (struct ifaddrmsg *) NLMSG_DATA(nlh);
+    int ifindex = ifa->ifa_index;
+    sa_family_t ifa_family = ifa->ifa_family;
+    std::cout<<"CHECK"<<std::endl;
+    printf("ifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
+    struct rtattr *rta = IFA_RTA(ifa);
+    int rtl = IFA_PAYLOAD(nlh);
+    while (RTA_OK(rta, rtl)) {
+        if (rta->rta_type == IFA_ADDRESS) {
+            char ip[ifa_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
+            inet_ntop(ifa_family,RTA_DATA(rta),ip,sizeof(ip));
+            printf("Interface No.%i ip address: %s deleted\n",ifindex,ip);
+        }
+        rta = RTA_NEXT(rta, rtl);
+    }
 }
 
 

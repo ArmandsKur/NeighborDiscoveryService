@@ -202,21 +202,19 @@ int main() {
                             case RTM_NEWLINK:
                                 std::cout << "RTM_NEWLINK" << std::endl;
                                 if_mngr.handle_newlink(nlh);
-                                //process_rtm_newlink(nlh);
                                 break;
                             case RTM_DELLINK:
                                 std::cout << "RTM_DELLINK" << std::endl;
                                 if_mngr.handle_dellink(nlh);
-                                //process_rtm_dellink(nlh);
                                 break;
 
                             case RTM_NEWADDR:
                                 std::cout << "RTM_NEWADDR" << std::endl;
-                                process_rtm_newaddr(nlh);
+                                if_mngr.handle_newaddr(nlh);
                                 break;
                             case RTM_DELADDR:
                                 std::cout << "RTM_DELADDR" << std::endl;
-                                process_rtm_deladdr(nlh);
+                                if_mngr.handle_deladdr(nlh);
                                 break;
                         }
                     }
