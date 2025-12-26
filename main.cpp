@@ -22,6 +22,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "interface_manager.h"
+
 //For each connection, display(in this context store) the local interface name, neighbor's MAC address in that specific network, and neighbor's IP address in that network (or indicate if none exists)
 /*struct Connection {
 
@@ -84,7 +86,7 @@ void process_rtm_newlink(nlmsghdr* nlh) {
                      "%02x:%02x:%02x:%02x:%02x:%02x",
                      mac_addr[0], mac_addr[1], mac_addr[2],
                      mac_addr[3], mac_addr[4], mac_addr[5]);
-            std::cout << "ip address: " << buf << std::endl;
+            std::cout << "Interface MAC address: " << buf << std::endl;
         }
         if (rta->rta_type == IFLA_OPERSTATE) {
             const char* operstate = (char*)(RTA_DATA(rta));
@@ -118,6 +120,23 @@ void process_rtm_newaddr(nlmsghdr* nlh) {
         rta = RTA_NEXT(rta, rtl);
     }
 }
+void process_rtm_deladdr(nlmsghdr* nlh) {
+    struct ifaddrmsg *ifa = (struct ifaddrmsg *) NLMSG_DATA(nlh);
+    int ifindex = ifa->ifa_index;
+    sa_family_t ifa_family = ifa->ifa_family;
+    std::cout<<"CHECK"<<std::endl;
+    printf("ifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
+    struct rtattr *rta = IFA_RTA(ifa);
+    int rtl = IFA_PAYLOAD(nlh);
+    while (RTA_OK(rta, rtl)) {
+        if (rta->rta_type == IFA_ADDRESS) {
+            char ip[ifa_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
+            inet_ntop(ifa_family,RTA_DATA(rta),ip,sizeof(ip));
+            printf("Interface No.%i ip address: %s deleted\n",ifindex,ip);
+        }
+        rta = RTA_NEXT(rta, rtl);
+    }
+}
 
 int main() {
     int ready;
@@ -143,12 +162,8 @@ int main() {
 
     std::cout << "fd_count: " << fd_count << std::endl;
 
-    int size;
-    //struct iovec iov = { buffer, sizeof(buffer) };
-    //struct msghdr msg;
-    //struct nlmsghdr *nlh;
+    InterfaceManager if_mngr;
 
-    //nlh = (struct nlmsghdr*)buffer;
     while (fd_count > 0) {
         ready = poll(pfds.data(), fd_count, -1);
         if (ready == -1)
@@ -186,11 +201,13 @@ int main() {
                         switch (nlh->nlmsg_type) {
                             case RTM_NEWLINK:
                                 std::cout << "RTM_NEWLINK" << std::endl;
-                                process_rtm_newlink(nlh);
+                                if_mngr.handle_newlink(nlh);
+                                //process_rtm_newlink(nlh);
                                 break;
                             case RTM_DELLINK:
                                 std::cout << "RTM_DELLINK" << std::endl;
-                                process_rtm_dellink(nlh);
+                                if_mngr.handle_dellink(nlh);
+                                //process_rtm_dellink(nlh);
                                 break;
 
                             case RTM_NEWADDR:
@@ -199,7 +216,7 @@ int main() {
                                 break;
                             case RTM_DELADDR:
                                 std::cout << "RTM_DELADDR" << std::endl;
-                                //handle_addr(nh);
+                                process_rtm_deladdr(nlh);
                                 break;
                         }
                     }
