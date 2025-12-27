@@ -4,12 +4,13 @@
 #include <unordered_map>
 class InterfaceManager {
     public:
+        //InterfaceManager();
         void handle_newlink(struct nlmsghdr* nlh);
         void handle_dellink(struct nlmsghdr* nlh);
         void handle_newaddr(struct nlmsghdr* nlh);
         void handle_deladdr(struct nlmsghdr* nlh);
         void add_address(int ifindex, struct ip_address);
-        void delete_address(int ifindex, struct ip_address);
+        void del_address(int ifindex, struct ip_address);
     private:
         std::unordered_map<int,ethernet_interface> interface_list;
 };

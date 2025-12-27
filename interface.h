@@ -1,6 +1,6 @@
 #ifndef NEIGHBORDISCOVERYSERVICE_INTERFACE_H
 #define NEIGHBORDISCOVERYSERVICE_INTERFACE_H
-#include <string>
+#include <array>
 #include <vector>
 
 struct ip_address {
@@ -10,12 +10,16 @@ struct ip_address {
         struct in_addr ipv4;
         struct in6_addr ipv6;
     };
+
+    //bool operator==(const struct ip_address & ip_addr) const;
 };
 
 struct ethernet_interface {
     int ifindex;
-    const char* ifname;
-    const uint8_t* mac_addr;
+    //const char* ifname;
+    std::string ifname;
+    //const uint8_t* mac_addr;
+    std::array<uint8_t, 6> mac_addr;
     std::vector<ip_address> ip_addresses;
     bool is_active;
 };

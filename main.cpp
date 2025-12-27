@@ -58,7 +58,7 @@ void del_from_pfds(std::vector<pollfd> *pfds, int fd, nfds_t *fd_count) {
     );
     (*fd_count) = pfds->size();
 }
-
+/*
 void process_rtm_newlink(nlmsghdr* nlh) {
     struct ifinfomsg *ifi = (struct ifinfomsg *) NLMSG_DATA(nlh);
     struct rtattr *rta = IFLA_RTA(ifi);
@@ -137,7 +137,7 @@ void process_rtm_deladdr(nlmsghdr* nlh) {
         rta = RTA_NEXT(rta, rtl);
     }
 }
-
+*/
 int main() {
     int ready;
     struct sockaddr_nl sa;
@@ -164,6 +164,30 @@ int main() {
 
     InterfaceManager if_mngr;
 
+    /* format the dump request */
+    struct nlmsghdr *nh;    /* The nlmsghdr with payload to send */
+    //struct iovec iov = { nh, nh->nlmsg_len };
+    struct msghdr msg;
+
+    struct {
+        struct nlmsghdr nlh;
+        struct ifinfomsg ifm;
+    } req;
+
+    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.nlh.nlmsg_type = RTM_GETLINK;
+    //req.nlh.nlmsg_type = RTM_GETADDR;
+    req.nlh.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
+    req.nlh.nlmsg_seq = 1;
+    req.nlh.nlmsg_pid = getpid();
+    req.ifm.ifi_family = AF_UNSPEC;
+
+
+    send(netlink_fd, &req, sizeof(req), 0);
+    //req.nlh.nlmsg_type = RTM_GETADDR;
+    //req.nlh.nlmsg_seq = 2;
+    //send(netlink_fd, &req, sizeof(req), 0);
+    /*test*/
     while (fd_count > 0) {
         ready = poll(pfds.data(), fd_count, -1);
         if (ready == -1)
