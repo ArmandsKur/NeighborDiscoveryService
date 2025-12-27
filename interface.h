@@ -7,11 +7,9 @@ struct ip_address {
     sa_family_t family;
 
     union {
-        struct in_addr ipv4;
-        struct in6_addr ipv6;
+        in_addr ipv4;
+        in6_addr ipv6;
     };
-
-    //bool operator==(const struct ip_address & ip_addr) const;
 };
 
 struct ethernet_interface {

@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "event_poll.h"
 #include "interface_manager.h"
 
 //For each connection, display(in this context store) the local interface name, neighbor's MAC address in that specific network, and neighbor's IP address in that network (or indicate if none exists)
@@ -140,6 +141,12 @@ void process_rtm_deladdr(nlmsghdr* nlh) {
 */
 int main() {
     int ready;
+    EventPoll event_poll;
+    InterfaceManager if_mngr = event_poll.if_mngr;
+    event_poll.startup_netlink();
+
+    return 0;
+    /*
     struct sockaddr_nl sa;
 
     std::vector<pollfd> pfds;
@@ -161,10 +168,19 @@ int main() {
     add_to_pdfds(&pfds,netlink_fd,&fd_count);
 
     std::cout << "fd_count: " << fd_count << std::endl;
+    */
 
-    InterfaceManager if_mngr;
+    int netlink_fd = event_poll.netlink_fd;
+    std::vector<pollfd> pfds = event_poll.pfds;
+    nfds_t fd_count = event_poll.fd_count;
 
-    /* format the dump request */
+    /*
+     * Send and receive netlink dump
+     * format the dump request
+     */
+    int len;
+    char buffer[8192];
+    int getlink_dump_seq = 1;
     struct nlmsghdr *nh;    /* The nlmsghdr with payload to send */
     //struct iovec iov = { nh, nh->nlmsg_len };
     struct msghdr msg;
@@ -178,16 +194,40 @@ int main() {
     req.nlh.nlmsg_type = RTM_GETLINK;
     //req.nlh.nlmsg_type = RTM_GETADDR;
     req.nlh.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
-    req.nlh.nlmsg_seq = 1;
+    req.nlh.nlmsg_seq = getlink_dump_seq;
     req.nlh.nlmsg_pid = getpid();
     req.ifm.ifi_family = AF_UNSPEC;
 
 
     send(netlink_fd, &req, sizeof(req), 0);
-    //req.nlh.nlmsg_type = RTM_GETADDR;
-    //req.nlh.nlmsg_seq = 2;
-    //send(netlink_fd, &req, sizeof(req), 0);
-    /*test*/
+
+    bool is_dump_done = false;
+    while (!is_dump_done) {
+
+        len = recv(netlink_fd, &buffer, sizeof(buffer), 0);
+        for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+            if (nlh->nlmsg_seq != getlink_dump_seq)
+                continue;
+            if (nlh->nlmsg_type == NLMSG_DONE) {
+                is_dump_done = true;
+                break;
+            }
+            if (nlh->nlmsg_type == NLMSG_ERROR) {
+                std::cerr << "Netlink error\n";
+                is_dump_done = true;
+                break;
+            }
+            if (nlh->nlmsg_type == RTM_NEWLINK) {
+                std::cout<<"RTM_NEWLINK"<<std::endl;
+                if_mngr.handle_newlink(nlh);
+            }
+
+        }
+    }
+
+    //Remove when tested.
+    //return 0;
+
     while (fd_count > 0) {
         ready = poll(pfds.data(), fd_count, -1);
         if (ready == -1)
@@ -221,6 +261,9 @@ int main() {
                             std::cerr << "Netlink error\n";
                             continue;
                         }
+
+                        if (nlh->nlmsg_seq != 0)
+                            continue;
 
                         switch (nlh->nlmsg_type) {
                             case RTM_NEWLINK:

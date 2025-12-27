@@ -25,46 +25,120 @@
 
 #include "interface.h"
 #include "interface_manager.h"
-/*
-InterfaceManager::InterfaceManager() {
-    struct ifaddrs *ifaddr;
 
-    if (getifaddrs(&ifaddr) == -1) {
-        perror("getifaddrs");
-        exit(EXIT_FAILURE);
-    }
+//Function used to create netlink socket and return its fd
+int InterfaceManager::open_netlink_socket() {
+    struct sockaddr_nl sa;
+    int netlink_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    fcntl(netlink_fd, F_SETFL, O_NONBLOCK);
+    if (netlink_fd != -1) {
+        memset(&sa, 0, sizeof(sa));
+        sa.nl_family = AF_NETLINK;
+        sa.nl_groups = RTMGRP_LINK |
+                       RTMGRP_IPV4_IFADDR |
+                       RTMGRP_IPV6_IFADDR;
+        //sa.nl_groups = RTMGRP_LINK;
+        bind(netlink_fd, (struct sockaddr*)&sa, sizeof(sa));
 
-    for (struct ifaddrs *ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        std::cout<< "addr" << std::endl;
-        if (ifa->ifa_addr == NULL)
-            continue;
-        std::string ifname = ifa->ifa_name;
-        std::cout<< "ifname: " << ifname << std::endl;
-        int family = ifa->ifa_addr->sa_family;
-        if (family == AF_INET) {
-            struct sockaddr_in *addr = (struct sockaddr_in *)ifa->ifa_addr;
-            // = inet_ntoa(addr->sin_addr);
-            //addr->sin_addr
-            char ip[family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
-            inet_ntop(family,&addr->sin_addr,ip,sizeof(ip));
-            std::cout<< "AF_INET " << ip << std::endl;
-        } else if (family == AF_INET6) {
-            char ip[family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
-            inet_ntop(family,ifa->ifa_addr->sa_data,ip,sizeof(ip));
-            std::cout<< "AF_INET6 " << ip << std::endl;
-        } else { //No Ip address for interface
-            std::cout<< "no address" << std::endl;
-        }
-
-        bool if_up = (ifa->ifa_flags & IFF_UP);
-        bool if_running = (ifa->ifa_flags & IFF_RUNNING);
-        bool is_loopback = (ifa->ifa_flags & IFF_LOOPBACK);
-        bool is_active = (if_up && if_running);
-
-
+        return netlink_fd;
+    } else {
+        perror("socket");
     }
 }
-*/
+
+/*
+ *Function used to perform initial getlink dump which
+ *Done so the interface_list can be filled with interface data
+ */
+void InterfaceManager::do_getlink_dump(int netlink_fd) {
+    int len;
+    char buffer[8192];
+    int getlink_dump_seq = 1;
+
+    //Create struct to send getlink dump request
+    struct {
+        struct nlmsghdr nlh;
+        struct ifinfomsg ifm;
+    } req;
+    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.nlh.nlmsg_type = RTM_GETLINK;
+    req.nlh.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
+    req.nlh.nlmsg_seq = getlink_dump_seq;
+    req.nlh.nlmsg_pid = getpid();
+    req.ifm.ifi_family = AF_UNSPEC;
+
+
+    send(netlink_fd, &req, sizeof(req), 0);
+
+    bool is_dump_done = false;
+    while (!is_dump_done) {
+
+        len = recv(netlink_fd, &buffer, sizeof(buffer), 0);
+        for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+            if (nlh->nlmsg_seq != getlink_dump_seq)
+                continue;
+            if (nlh->nlmsg_type == NLMSG_DONE) {
+                is_dump_done = true;
+                break;
+            }
+            if (nlh->nlmsg_type == NLMSG_ERROR) {
+                std::cerr << "Netlink error\n";
+                is_dump_done = true;
+                break;
+            }
+            if (nlh->nlmsg_type == RTM_NEWLINK) {
+                std::cout<<"RTM_NEWLINK"<<std::endl;
+                handle_newlink(nlh);
+            }
+
+        }
+    }
+}
+//Same idea as with getlink, just for IP addresses
+void InterfaceManager::do_getaddr_dump(int netlink_fd) {
+    int len;
+    char buffer[8192];
+    int getaddr_dump_seq = 2;
+    //Create struct to send getaddr dump request
+    struct {
+        struct nlmsghdr nlh;
+        struct ifinfomsg ifm;
+    } req;
+    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.nlh.nlmsg_type = RTM_GETADDR;
+    req.nlh.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
+    req.nlh.nlmsg_seq = getaddr_dump_seq;
+    req.nlh.nlmsg_pid = getpid();
+    req.ifm.ifi_family = AF_UNSPEC;
+
+
+    send(netlink_fd, &req, sizeof(req), 0);
+
+    bool is_dump_done = false;
+    while (!is_dump_done) {
+
+        len = recv(netlink_fd, &buffer, sizeof(buffer), 0);
+        for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+            if (nlh->nlmsg_seq != getaddr_dump_seq)
+                continue;
+            if (nlh->nlmsg_type == NLMSG_DONE) {
+                is_dump_done = true;
+                break;
+            }
+            if (nlh->nlmsg_type == NLMSG_ERROR) {
+                std::cerr << "Netlink error\n";
+                is_dump_done = true;
+                break;
+            }
+            if (nlh->nlmsg_type == RTM_NEWADDR) {
+                std::cout<<"RTM_NEWADDR"<<std::endl;
+                handle_newaddr(nlh);
+            }
+
+        }
+    }
+}
+
 void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
     auto *ifi = static_cast<struct ifinfomsg *>(NLMSG_DATA(nlh));
 
@@ -155,17 +229,19 @@ void InterfaceManager::handle_newaddr(struct nlmsghdr *nlh) {
         if (rta->rta_type == IFA_ADDRESS) {
             ip_address ipaddress = {};
             ipaddress.family = ifa_family;
+            sockaddr_in6 testip;
+            char ip[ifa_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
             if (ifa_family == AF_INET) {
                 std::memcpy(&ipaddress.ipv4, RTA_DATA(rta), sizeof(struct in_addr));
+                inet_ntop(ifa_family,&ipaddress.ipv4,ip,sizeof(ip));
+                printf("Interface No.%i ip address: %s addded\n",ifindex,ip);
             } else {
                 std::memcpy(&ipaddress.ipv6, RTA_DATA(rta), sizeof(struct in6_addr));
+                inet_ntop(ifa_family,&ipaddress.ipv6,ip,sizeof(ip));
+                printf("Interface No.%i ip address: %s addded\n",ifindex,ip);
             }
 
             add_address(ifindex,ipaddress);
-            //interface_list[ifindex]
-            char ip[ifa_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
-            inet_ntop(ifa_family,RTA_DATA(rta),ip,sizeof(ip));
-            printf("Interface No.%i ip address: %s addded\n",ifindex,ip);
         }
         rta = RTA_NEXT(rta, rtl);
     }

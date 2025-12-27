@@ -25,3 +25,35 @@
 #include "interface_manager.h"
 
 #include "event_poll.h"
+
+void EventPoll::add_to_pdfds(int new_fd) {
+    pollfd new_pollfd;
+    new_pollfd.fd = new_fd;
+    new_pollfd.events = POLLIN;
+    new_pollfd.revents = 0;
+
+    pfds.push_back(new_pollfd);
+
+    fd_count = pfds.size();
+}
+
+void EventPoll::del_from_pfds(int fd) {
+    pfds.erase(
+        std::remove_if(
+            pfds.begin(),
+            pfds.end(),
+            [fd](const pollfd &pfd) {
+                return pfd.fd == fd;
+            }
+        ),
+        pfds.end()
+    );
+    fd_count = pfds.size();
+}
+
+void EventPoll::startup_netlink() {
+    netlink_fd = if_mngr.open_netlink_socket();
+    add_to_pdfds(netlink_fd);
+    if_mngr.do_getlink_dump(netlink_fd);
+    if_mngr.do_getaddr_dump(netlink_fd);
+}
