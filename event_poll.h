@@ -31,6 +31,7 @@ class EventPoll {
         void add_to_pdfds(int new_fd);
         void del_from_pfds(int fd);
         void startup_netlink();
+        void run_event_poll();
 
         //for some time made public
         std::vector<struct pollfd> pfds;
