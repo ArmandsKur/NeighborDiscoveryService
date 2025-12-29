@@ -8,4 +8,6 @@ add_executable(NeighborDiscoveryService main.cpp
         interface_manager.h
         event_poll.cpp
         event_poll.h
-        interface.h)
+        interface.h
+        neighbor_manager.cpp
+        neighbor_manager.h)
