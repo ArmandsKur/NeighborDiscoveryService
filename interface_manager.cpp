@@ -30,14 +30,12 @@
 int InterfaceManager::open_netlink_socket() {
     struct sockaddr_nl sa;
     int netlink_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-    fcntl(netlink_fd, F_SETFL, O_NONBLOCK);
     if (netlink_fd != -1) {
         memset(&sa, 0, sizeof(sa));
         sa.nl_family = AF_NETLINK;
         sa.nl_groups = RTMGRP_LINK |
                        RTMGRP_IPV4_IFADDR |
                        RTMGRP_IPV6_IFADDR;
-        //sa.nl_groups = RTMGRP_LINK;
         bind(netlink_fd, (struct sockaddr*)&sa, sizeof(sa));
 
         return netlink_fd;
@@ -139,6 +137,11 @@ void InterfaceManager::do_getaddr_dump(int netlink_fd) {
     }
 }
 
+void InterfaceManager::socket_set_nonblock(int netlink_fd) {
+    fcntl(netlink_fd, F_SETFL, O_NONBLOCK);
+}
+
+
 void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
     auto *ifi = static_cast<struct ifinfomsg *>(NLMSG_DATA(nlh));
 
@@ -175,7 +178,7 @@ void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
                      "%02x:%02x:%02x:%02x:%02x:%02x",
                      mac_addr[0], mac_addr[1], mac_addr[2],
                      mac_addr[3], mac_addr[4], mac_addr[5]);
-            std::cout << "ip address: " << buf << std::endl;
+            std::cout << "MAC address: " << buf << std::endl;
         }
         rta = RTA_NEXT(rta, rtl);
     }

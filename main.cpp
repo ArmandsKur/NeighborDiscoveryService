@@ -24,12 +24,16 @@
 
 #include "event_poll.h"
 #include "interface_manager.h"
+#include "neighbor_manager.h"
 
 int main() {
-    int ready;
+
+    NeighborManager neighbor_mngr;
+
+    /*
     EventPoll event_poll;
     event_poll.startup_netlink();
     event_poll.run_event_poll();
-
+    */
     return 0;
 }

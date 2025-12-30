@@ -56,6 +56,7 @@ void EventPoll::startup_netlink() {
     add_to_pdfds(netlink_fd);
     if_mngr.do_getlink_dump(netlink_fd);
     if_mngr.do_getaddr_dump(netlink_fd);
+    if_mngr.socket_set_nonblock(netlink_fd);
 }
 
 void EventPoll::run_event_poll() {

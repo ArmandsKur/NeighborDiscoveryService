@@ -25,6 +25,7 @@
 #include <fcntl.h>
 
 #include "interface_manager.h"
+#include "neighbor_manager.h"
 
 class EventPoll {
     public:
@@ -34,19 +35,22 @@ class EventPoll {
         void run_event_poll();
 
         //for some time made public
-        std::vector<struct pollfd> pfds;
-        nfds_t fd_count = 0;
-        int netlink_fd;
-        InterfaceManager if_mngr;
-
-    private:
-        //Variables related to storing fds used in the poll
         /*
         std::vector<struct pollfd> pfds;
         nfds_t fd_count = 0;
-        Variables related to netlink
+        int netlink_fd;
+        InterfaceManager if_mngr;
+        */
+
+    private:
+        //Variables related to storing fds used in the poll
+        std::vector<struct pollfd> pfds;
+        nfds_t fd_count = 0;
+        //Variables related to netlink
         InterfaceManager if_mngr;
         int netlink_fd;
-        */
+        //Variables related to neighour management
+        NeighborManager neighbor_mngr;
+
 };
 #endif //NEIGHBORDISCOVERYSERVICE_EVENT_POLL_H
