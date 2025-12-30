@@ -39,6 +39,7 @@ class NeighborManager {
         NeighborManager();
         int create_ethernet_socket();
         void send_ethernet_msg(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> des_mac);
+        void recv_ethernet_msg();
     private:
         std::array<uint8_t, 16> client_id;
         std::array<uint8_t, 16> get_random_client_id();

@@ -29,7 +29,7 @@
 //Function used to create netlink socket and return its fd
 int InterfaceManager::open_netlink_socket() {
     struct sockaddr_nl sa;
-    int netlink_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    netlink_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
     if (netlink_fd != -1) {
         memset(&sa, 0, sizeof(sa));
         sa.nl_family = AF_NETLINK;

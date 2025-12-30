@@ -18,6 +18,7 @@ class InterfaceManager {
 
     private:
         std::unordered_map<int,ethernet_interface> interface_list;
+        int netlink_fd;
 
 };
 #endif //NEIGHBORDISCOVERYSERVICE_INTERFACE_MANAGER_H

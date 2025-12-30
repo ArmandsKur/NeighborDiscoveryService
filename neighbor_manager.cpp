@@ -27,7 +27,7 @@
 
 #include "neighbor_manager.h"
 #include "interface.h"
-
+#include <errno.h>
 NeighborManager::NeighborManager() {
     client_id = get_random_client_id();
 }
@@ -75,12 +75,12 @@ struct ethhdr NeighborManager::init_ethhdr(std::array<uint8_t, 6> source_mac,std
 
 //Function used to send message using raw socket
 void NeighborManager::send_ethernet_msg(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> dest_mac) {
-    //struct ethhdr eh = init_ethhdr(source_mac,dest_mac);
-    struct ethhdr eh = {
+    struct ethhdr eh = init_ethhdr(source_mac,dest_mac);
+    /*struct ethhdr eh = {
         .h_source = {source_mac[0], source_mac[1], source_mac[2], source_mac[3],source_mac[4],source_mac[5]},
         .h_dest = {dest_mac[0], dest_mac[1], dest_mac[2], dest_mac[3], dest_mac[4], dest_mac[5]},
         .h_proto = htons(ETH_P_IP),
-    };
+    };*/
 
     struct iphdr iph = {};
     struct udphdr uh = {};
@@ -90,6 +90,38 @@ void NeighborManager::send_ethernet_msg(std::array<uint8_t, 6> source_mac,std::a
 
     int ifindex = 1;//for now hardcoded
 
+    iph.ihl = 5;
+    iph.version = 4;
+    iph.tos = 16;
+    iph.id = 1;
+    iph.ttl = 64;
+    iph.protocol = IPPROTO_UDP;
+    iph.saddr = 1;
+    iph.daddr = 2;
+    iph.tot_len = htons(sizeof(buf) - ETH_HLEN);
+    iph.check = 0;
 
+    struct sockaddr_ll saddr_ll = {
+        .sll_ifindex = ifindex,
+        .sll_halen = ETH_ALEN,
+        .sll_addr = {dest_mac[0], dest_mac[1], dest_mac[2], dest_mac[3], dest_mac[4], dest_mac[5]},
+    };
 
+    /* construct a packet */
+    memcpy(buf, &eh, sizeof(eh));
+    memcpy(buf + sizeof(eh), &iph, sizeof(iph));
+    memcpy(buf + sizeof(eh) + sizeof(iph), &uh, sizeof(uh));
+
+    int errno;
+    int n = sendto(s, buf, sizeof(buf), 0, (struct sockaddr *)&saddr_ll, sizeof(saddr_ll));
+
+    std::cout << "Sendto result " << n << std::endl;
+    std::cout << "buf size" << sizeof(buf) << std::endl;
+    std::cout << "socket " << s << std::endl;
+    std::cout << "errno " << errno << std::endl;
+}
+
+void NeighborManager::recv_ethernet_msg() {
+    int len;
+    len = recv(netlink_fd, &buffer, sizeof(buffer), 0);
 }
