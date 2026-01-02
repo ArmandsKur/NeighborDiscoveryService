@@ -52,7 +52,7 @@ void EventPoll::del_from_pfds(int fd) {
 }
 
 void EventPoll::startup_netlink() {
-    netlink_fd = if_mngr.open_netlink_socket();
+    int netlink_fd = if_mngr.open_netlink_socket();
     add_to_pdfds(netlink_fd);
     if_mngr.do_getlink_dump(netlink_fd);
     if_mngr.do_getaddr_dump(netlink_fd);

@@ -48,7 +48,7 @@ class EventPoll {
         nfds_t fd_count = 0;
         //Variables related to netlink
         InterfaceManager if_mngr;
-        int netlink_fd;
+        //int netlink_fd; //Now just stored in if_mngr
         //Variables related to neighour management
         NeighborManager neighbor_mngr;
 

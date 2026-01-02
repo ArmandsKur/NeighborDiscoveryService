@@ -28,6 +28,21 @@
 #include <unistd.h>
 #include "interface.h"
 
+#define ETH_P_NEIGHBOR 0x88B5 //used one of the Local Experimental Ethertype
+#define P_NEIGHBOR_SIZE 53 //define the size of total payload for neighbor protocol packet
+
+#pragma pack(push, 1)
+struct neighbor_payload {
+    uint8_t  client_id[16];
+    uint8_t  mac_addr[6];          // optional (already in ethhdr)
+    uint8_t  ip_family;       // AF_INET / AF_INET6 / 0
+    union {
+        struct in_addr  ipv4;
+        struct in6_addr ipv6;
+    };
+};
+#pragma pack(pop)
+
 struct neighbor {
     std::array<uint8_t, 16> neighbor_id;
 };
@@ -38,13 +53,17 @@ class NeighborManager {
     public:
         NeighborManager();
         int create_ethernet_socket();
-        void send_ethernet_msg(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> des_mac);
+        int create_broadcast_recv_socket(int ifindex);
+        void recv_broadcast(int rcv_sockfd);
+        void send_ethernet_msg(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> des_mac,struct neighbor_payload payload);
         void recv_ethernet_msg();
     private:
+        int eth_socket;
         std::array<uint8_t, 16> client_id;
         std::array<uint8_t, 16> get_random_client_id();
         const std::array<uint8_t, 6> broadcast_mac = {0xFF,0xFF,0xFF,0xFF,0xFF};
         struct ethhdr init_ethhdr(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> dest_mac);
+        struct sockaddr_ll init_sockaddr_ll(int ifindex, std::array<uint8_t, 6> dest_mac);
 
 };
 #endif //NEIGHBORDISCOVERYSERVICE_NEIGHBOR_MANAGER_H
