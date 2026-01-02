@@ -23,8 +23,10 @@
 #include <poll.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <ctime>
 
 #include <array>
+#include <unordered_map>
 #include <unistd.h>
 #include "interface.h"
 
@@ -34,7 +36,7 @@
 #pragma pack(push, 1)
 struct neighbor_payload {
     uint8_t  client_id[16];
-    uint8_t  mac_addr[6];          // optional (already in ethhdr)
+    uint8_t  mac_addr[6];
     uint8_t  ip_family;       // AF_INET / AF_INET6 / 0
     union {
         struct in_addr  ipv4;
@@ -43,8 +45,17 @@ struct neighbor_payload {
 };
 #pragma pack(pop)
 
-struct neighbor {
+//For each connection, display the local interface name, neighbor's MAC address in that specific network, and neighbor's IP address in that network (or indicate if none exists)
+struct neighbor_connection {
     std::array<uint8_t, 16> neighbor_id;
+    uint8_t  mac_addr[6];
+    std::string local_ifname;
+    std::time_t last_seen;
+    uint8_t  ip_family;       // AF_INET / AF_INET6 / 0
+    union {
+        struct in_addr  ipv4;
+        struct in6_addr ipv6;
+    };
 };
 
 
@@ -59,6 +70,7 @@ class NeighborManager {
         void recv_ethernet_msg();
     private:
         int eth_socket;
+        std::unordered_map<std::string,struct neighbor_connection> active_neighbors;
         std::array<uint8_t, 16> client_id;
         std::array<uint8_t, 16> get_random_client_id();
         const std::array<uint8_t, 6> broadcast_mac = {0xFF,0xFF,0xFF,0xFF,0xFF};

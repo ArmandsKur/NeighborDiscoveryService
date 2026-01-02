@@ -21,7 +21,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <fcntl.h>
-
+#include <ctime>
 #include <array>
 #include <unistd.h>
 
@@ -130,7 +130,7 @@ int NeighborManager::create_broadcast_recv_socket(int ifindex) {
     rcv_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
 
     //Close the socket and return -1 if unable to bind.
-    if (bind(rcv_sockfd, (struct sockaddr *) &ll, sizeof(ll)) == -1) {
+    if (bind(rcv_sockfd, (struct sockaddr *)&ll, sizeof(ll)) == -1) {
         perror("bind");
         close(rcv_sockfd);
         return -1;
@@ -142,19 +142,67 @@ int NeighborManager::create_broadcast_recv_socket(int ifindex) {
 
 void NeighborManager::recv_broadcast(int rcv_sockfd) {
     ssize_t len;
-    uint8_t buf[128];
+    uint8_t buf[P_NEIGHBOR_SIZE];
+    struct sockaddr_ll ll{};
+    socklen_t sockaddr_len = sizeof(ll);
 
-    len = recvfrom(rcv_sockfd, buf, sizeof(buf), 0, NULL, NULL);
+    std::time_t rcv_time = std::time(nullptr);
+    len = recvfrom(rcv_sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&ll, &sockaddr_len);
     if (len < 0) {
         perror("recv");
+        return;
     }
+
+    //Get interface name from sockaddr received in recvfrom
+    int ifindex = ll.sll_ifindex;
+    char ifname[IFNAMSIZ];
+    if (!if_indextoname(ifindex, ifname)) {
+        perror("if_indextoname");
+        return;
+    }
+
+    //Check that correct protocol packet was received
+    const ethhdr* eth = (ethhdr*)buf;
+    if(eth->h_proto != htons(ETH_P_NEIGHBOR)) {
+        std::cerr << "received incorrect protocol\n";
+        return;
+    }
+
+    //Check that the payload is of correct size for neighbor_payload struct
+    const uint8_t* payload = buf + sizeof(struct ethhdr);
+    size_t payload_len = len - sizeof(struct ethhdr);
+    if (payload_len < sizeof(neighbor_payload)) {
+        std::cerr << "payload too short\n";
+        return;
+    }
+
+    //copy the neighbor payload recieved to the neighbor_payload struct variable
+    neighbor_payload neighbor_pyld;
+    std::memcpy(&neighbor_pyld, payload, sizeof(neighbor_pyld));
+
+    //Create neighbor_connection struct and fill it with information
+    neighbor_connection neigh_conn{};
+    std::memcpy(&neigh_conn.neighbor_id,neighbor_pyld.client_id,sizeof(neighbor_pyld.client_id));
+    std::memcpy(&neigh_conn.mac_addr,neighbor_pyld.mac_addr,sizeof(neighbor_pyld.mac_addr));
+    neigh_conn.local_ifname = ifname;
+    neigh_conn.last_seen = rcv_time;
+    if (neighbor_pyld.ip_family == AF_INET) {
+        neigh_conn.ip_family = AF_INET;
+        neigh_conn.ipv4 = neighbor_pyld.ipv4;
+    } else if (neighbor_pyld.ip_family == AF_INET6) {
+        neigh_conn.ip_family = AF_INET6;
+        neigh_conn.ipv6 = neighbor_pyld.ipv6;
+    } else {
+        neigh_conn.ip_family = 0;
+    }
+
+    active_neighbors[ifname] = neigh_conn;
 }
 
 void NeighborManager::recv_ethernet_msg() {
     int len;
     int rcv_sock, ret;
-    //uint8_t buf[128];
-    uint8_t buf[53];
+    uint8_t buf[P_NEIGHBOR_SIZE];
 
     struct sockaddr_ll ll{};
     ll.sll_family = AF_PACKET;
@@ -206,7 +254,7 @@ void NeighborManager::recv_ethernet_msg() {
     std::cout << "proto raw: 0x"<< std::hex << ntohs(eth->h_proto) << std::dec << "\n";
 
     neighbor_payload pyld;
-    std::memcpy(&pyld, buf + sizeof(ethhdr), sizeof(pyld));
+    std::memcpy(&pyld, payload, sizeof(pyld));
 
 
     //const neighbor_payload* pyld = (neighbor_payload*)payload;

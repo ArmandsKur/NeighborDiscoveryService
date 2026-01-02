@@ -41,6 +41,7 @@ int InterfaceManager::open_netlink_socket() {
         return netlink_fd;
     } else {
         perror("socket");
+        return -1;
     }
 }
 
@@ -141,6 +142,57 @@ void InterfaceManager::socket_set_nonblock(int netlink_fd) {
     fcntl(netlink_fd, F_SETFL, O_NONBLOCK);
 }
 
+void InterfaceManager::handle_netlink_event(pollfd pfd) {
+    if (pfd.revents & POLLIN) {
+        char buffer[8192];
+        struct iovec iov = {buffer,sizeof(buffer)};
+        struct sockaddr_nl sa;
+        struct msghdr msg = {&sa,sizeof(sa),&iov,1};
+
+        ssize_t len = recvmsg(pfd.fd, &msg, 0);
+        //Stop reading if error on recvmsg
+        if (len < 0) {
+            perror("recvmsg");
+            return;
+        }
+
+        //Handle only kernel messages
+        if (sa.nl_pid != 0)
+            return;
+
+        for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+            if (nlh->nlmsg_type == NLMSG_DONE)
+                break;
+
+            if (nlh->nlmsg_type == NLMSG_ERROR) {
+                std::cerr << "Netlink error\n";
+                continue;
+            }
+
+            if (nlh->nlmsg_seq != 0)
+                continue;
+
+            switch (nlh->nlmsg_type) {
+                case RTM_NEWLINK:
+                    std::cout << "RTM_NEWLINK" << std::endl;
+                    handle_newlink(nlh);
+                    break;
+                case RTM_DELLINK:
+                    std::cout << "RTM_DELLINK" << std::endl;
+                    handle_dellink(nlh);
+                    break;
+                case RTM_NEWADDR:
+                    std::cout << "RTM_NEWADDR" << std::endl;
+                    handle_newaddr(nlh);
+                    break;
+                case RTM_DELADDR:
+                    std::cout << "RTM_DELADDR" << std::endl;
+                    handle_deladdr(nlh);
+                    break;
+            }
+        }
+    }
+}
 
 void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
     auto *ifi = static_cast<struct ifinfomsg *>(NLMSG_DATA(nlh));

@@ -9,6 +9,7 @@ class InterfaceManager {
         void do_getlink_dump(int netlink_fd);
         void do_getaddr_dump(int netlink_fd);
         void socket_set_nonblock(int netlink_fd);
+        void handle_netlink_event(pollfd pfd);
         void handle_newlink(struct nlmsghdr* nlh);
         void handle_dellink(struct nlmsghdr* nlh);
         void handle_newaddr(struct nlmsghdr* nlh);

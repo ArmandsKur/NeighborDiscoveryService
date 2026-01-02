@@ -26,18 +26,21 @@
 
 #include "event_poll.h"
 
-void EventPoll::add_to_pdfds(int new_fd) {
+//Function to insert new fds to pollfd vectoe and store role of fd in the pfd_role map
+void EventPoll::add_to_pdfds(int new_fd, PollFdRole role) {
     pollfd new_pollfd;
     new_pollfd.fd = new_fd;
     new_pollfd.events = POLLIN;
     new_pollfd.revents = 0;
 
     pfds.push_back(new_pollfd);
+    pfd_role[new_fd] = role;
 
     fd_count = pfds.size();
 }
-
+//Erase specific fd from pfds vector and pfd_role unordered_map
 void EventPoll::del_from_pfds(int fd) {
+    //erase fd from vector
     pfds.erase(
         std::remove_if(
             pfds.begin(),
@@ -49,16 +52,21 @@ void EventPoll::del_from_pfds(int fd) {
         pfds.end()
     );
     fd_count = pfds.size();
+    //erase fd from unordered map
+    pfd_role.erase(fd);
 }
-
+//Function used to initialize netlink activities
 void EventPoll::startup_netlink() {
     int netlink_fd = if_mngr.open_netlink_socket();
-    add_to_pdfds(netlink_fd);
+    if (netlink_fd == -1) {
+        std::cerr << "Failed to open netlink socket\n";
+    }
+    add_to_pdfds(netlink_fd, PollFdRole::Netlink);
     if_mngr.do_getlink_dump(netlink_fd);
     if_mngr.do_getaddr_dump(netlink_fd);
     if_mngr.socket_set_nonblock(netlink_fd);
 }
-
+//Function used to run main event poll which will handle all the activities
 void EventPoll::run_event_poll() {
     int ready;
 
@@ -71,6 +79,10 @@ void EventPoll::run_event_poll() {
             if (pfd.revents == 0) {
                 continue;
             }
+            if (pfd_role[pfd.fd] == PollFdRole::Netlink) {
+                if_mngr.handle_netlink_event(pfd);
+            }
+            /*
             if (pfd.revents & POLLIN) {
                 char buffer[8192];
                 struct iovec iov = {buffer,sizeof(buffer)};
@@ -119,7 +131,7 @@ void EventPoll::run_event_poll() {
                             break;
                     }
                 }
-            }
+            }*/
         }
     }
 }

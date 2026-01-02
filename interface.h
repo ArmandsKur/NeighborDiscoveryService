@@ -38,9 +38,7 @@ struct ip_address {
 
 struct ethernet_interface {
     int ifindex;
-    //const char* ifname;
     std::string ifname;
-    //const uint8_t* mac_addr;
     std::array<uint8_t, 6> mac_addr;
     std::vector<ip_address> ip_addresses;
     bool is_active;
