@@ -22,15 +22,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "interface_manager.h"
-
 #include "event_poll.h"
 
 //Function to insert new fds to pollfd vectoe and store role of fd in the pfd_role map
-void EventPoll::add_to_pdfds(int new_fd, PollFdRole role) {
+void EventPoll::add_to_pfds(int new_fd, short events, PollFdRole role) {
     pollfd new_pollfd;
     new_pollfd.fd = new_fd;
-    new_pollfd.events = POLLIN;
+    new_pollfd.events = events; //POLLIN
     new_pollfd.revents = 0;
 
     pfds.push_back(new_pollfd);
@@ -61,15 +59,37 @@ void EventPoll::startup_netlink() {
     if (netlink_fd == -1) {
         std::cerr << "Failed to open netlink socket\n";
     }
-    add_to_pdfds(netlink_fd, PollFdRole::Netlink);
+    add_to_pfds(netlink_fd, POLLIN, PollFdRole::Netlink);
     if_mngr.do_getlink_dump(netlink_fd);
     if_mngr.do_getaddr_dump(netlink_fd);
     if_mngr.socket_set_nonblock(netlink_fd);
 }
+
+//Function to create sockets for neighbor manager and store their fds in pdfs vector
+void EventPoll::startup_neighbor_manager() {
+    int recv_fd = neighbor_mngr.create_broadcast_recv_socket();
+    if (recv_fd == -1) {
+        std::cerr << "Failed to create broadcast recv socket\n";
+        return;
+    }
+    add_to_pfds(recv_fd, POLLIN, PollFdRole::PacketRecv);
+    int send_fd = neighbor_mngr.create_broadcast_send_socket();
+    if (send_fd == -1) {
+        std::cerr << "Failed to create broadcast send socket\n";
+        return;
+    }
+    add_to_pfds(send_fd, POLLOUT, PollFdRole::PacketSend);
+}
 //Function used to run main event poll which will handle all the activities
 void EventPoll::run_event_poll() {
     int ready;
-
+    /*
+    //test chrono
+    std::chrono::time_point<std::chrono::steady_clock> last_packet_sent = std::chrono::steady_clock::now();
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(end - last_packet_sent);
+    std::cout<< "Slow calculations took " << time_span.count() << std::endl;
+    */
     while (fd_count > 0) {
         ready = poll(pfds.data(), fd_count, -1);
         if (ready == -1)
@@ -81,6 +101,10 @@ void EventPoll::run_event_poll() {
             }
             if (pfd_role[pfd.fd] == PollFdRole::Netlink) {
                 if_mngr.handle_netlink_event(pfd);
+            } else if (pfd_role[pfd.fd] == PollFdRole::PacketRecv) {
+
+            } else if (pfd_role[pfd.fd] == PollFdRole::PacketSend) {
+
             }
             /*
             if (pfd.revents & POLLIN) {

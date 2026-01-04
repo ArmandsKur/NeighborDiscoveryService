@@ -24,8 +24,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "interface_manager.h"
 #include "neighbor_manager.h"
+#include "interface_manager.h"
 
 enum class PollFdRole {
     Netlink,
@@ -33,22 +33,27 @@ enum class PollFdRole {
     PacketSend
 };
 
-class EventPoll {
+class EventPoll{
     public:
-        void add_to_pdfds(int new_fd, PollFdRole role);
-        void del_from_pfds(int fd);
         void startup_netlink();
+        void startup_neighbor_manager();
         void run_event_poll();
+
+        void add_to_pfds(int new_fd, short events, PollFdRole role);
+        void del_from_pfds(int fd);
+
+
     private:
         //Variables related to storing fds used in the poll
         std::vector<struct pollfd> pfds;
         std::unordered_map<int,PollFdRole> pfd_role;
         nfds_t fd_count = 0;
+        //Variables related to neighbor management
+        NeighborManager neighbor_mngr;
         //Variables related to netlink
         InterfaceManager if_mngr;
         //int netlink_fd; //Now just stored in if_mngr
-        //Variables related to neighour management
-        NeighborManager neighbor_mngr;
+
 
 };
 #endif //NEIGHBORDISCOVERYSERVICE_EVENT_POLL_H

@@ -1,10 +1,12 @@
 #ifndef NEIGHBORDISCOVERYSERVICE_INTERFACE_MANAGER_H
 #define NEIGHBORDISCOVERYSERVICE_INTERFACE_MANAGER_H
+
 #include "interface.h"
 #include <unordered_map>
+class NeighborManager;
+
 class InterfaceManager {
     public:
-        //InterfaceManager();
         int open_netlink_socket();
         void do_getlink_dump(int netlink_fd);
         void do_getaddr_dump(int netlink_fd);
@@ -20,6 +22,7 @@ class InterfaceManager {
     private:
         std::unordered_map<int,ethernet_interface> interface_list;
         int netlink_fd;
+
 
 };
 #endif //NEIGHBORDISCOVERYSERVICE_INTERFACE_MANAGER_H

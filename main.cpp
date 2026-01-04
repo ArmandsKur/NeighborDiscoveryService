@@ -36,7 +36,9 @@ int main() {
 
     EventPoll event_poll;
     event_poll.startup_netlink();
+    event_poll.startup_neighbor_manager();
     event_poll.run_event_poll();
+
     /*
     NeighborManager neighbor_mngr;
     std::array<uint8_t, 6> source_mac = {0xce,0x97,0xe5,0xd8,0x48,0x26};

@@ -14,6 +14,6 @@ add_executable(NeighborDiscoveryService main.cpp
 
 # Grant raw socket capabilities after build
 add_custom_command(TARGET NeighborDiscoveryService POST_BUILD
-        COMMAND sudo setcap cap_net_raw,cap_net_admin=eip $<TARGET_FILE:NeighborDiscoveryService>
-        COMMENT "Setting capabilities for raw sockets"
+        COMMAND sudo setcap cap_net_raw+ep $<TARGET_FILE:NeighborDiscoveryService>
+        COMMENT "Setting CAP_NET_RAW capability"
 )

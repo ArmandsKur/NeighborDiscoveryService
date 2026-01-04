@@ -22,9 +22,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <unordered_map>
+#include <errno.h>
 
 #include "interface.h"
 #include "interface_manager.h"
+#include "neighbor_manager.h"
 
 //Function used to create netlink socket and return its fd
 int InterfaceManager::open_netlink_socket() {
@@ -139,7 +141,13 @@ void InterfaceManager::do_getaddr_dump(int netlink_fd) {
 }
 
 void InterfaceManager::socket_set_nonblock(int netlink_fd) {
-    fcntl(netlink_fd, F_SETFL, O_NONBLOCK);
+    int flags = fcntl(netlink_fd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("fcntl");
+    }
+    if (fcntl(netlink_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("fcntl");
+    }
 }
 
 void InterfaceManager::handle_netlink_event(pollfd pfd) {
@@ -152,6 +160,10 @@ void InterfaceManager::handle_netlink_event(pollfd pfd) {
         ssize_t len = recvmsg(pfd.fd, &msg, 0);
         //Stop reading if error on recvmsg
         if (len < 0) {
+            //In case if nothing to read then don't print any errors
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return;
+            }
             perror("recvmsg");
             return;
         }
@@ -202,8 +214,12 @@ void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
     bool if_up = (ifi->ifi_flags & IFF_UP);
     bool if_running = (ifi->ifi_flags & IFF_RUNNING);
     bool is_active = (if_up && if_running);
+    bool is_loopback = (ifi->ifi_flags & IFF_LOOPBACK);
     interface_list[ifindex].ifindex = ifindex;
     interface_list[ifindex].is_active = is_active;
+    interface_list[ifindex].is_loopback = is_loopback;
+
+
 
     struct rtattr *rta = IFLA_RTA(ifi);
     int rtl = IFLA_PAYLOAD(nlh);
@@ -223,7 +239,6 @@ void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
         //Get interface mac address
         if (rta->rta_type == IFLA_ADDRESS) {
             auto mac_addr = static_cast<uint8_t *>(RTA_DATA(rta));
-            //interface_list[ifindex].mac_addr = mac_addr;
             std::memcpy(interface_list[ifindex].mac_addr.data(), RTA_DATA(rta), 6);
             char buf[18];
             snprintf(buf, sizeof(buf),
@@ -238,6 +253,12 @@ void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
 
 void InterfaceManager::handle_dellink(struct nlmsghdr *nlh) {
     auto ifi = static_cast<struct ifinfomsg *>(NLMSG_DATA(nlh));
+
+    //Ignore loopback interface
+    if (ifi->ifi_flags & IFF_LOOPBACK) {
+        return;
+    }
+
     int ifindex = ifi->ifi_index;
     interface_list.erase(ifindex);
     printf("interface No.%i deleted\n", ifindex);

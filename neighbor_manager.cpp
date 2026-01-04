@@ -24,14 +24,13 @@
 #include <ctime>
 #include <array>
 #include <unistd.h>
+#include <errno.h>
 
 #include "neighbor_manager.h"
-#include "interface.h"
-#include <errno.h>
 #include <bitset>
+
 NeighborManager::NeighborManager() {
     client_id = get_random_client_id();
-    create_ethernet_socket();
 }
 
 
@@ -61,12 +60,6 @@ std::array<uint8_t, 16> NeighborManager::get_random_client_id() {
     return client_id;
 }
 
-int NeighborManager::create_ethernet_socket() {
-    eth_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
-    //eth_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-    return eth_socket;
-}
-
 //Function used to return initialized ethhdr struct
 struct ethhdr NeighborManager::init_ethhdr(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> dest_mac) {
     struct ethhdr eh{};
@@ -86,58 +79,69 @@ struct sockaddr_ll NeighborManager::init_sockaddr_ll(int ifindex, std::array<uin
     return saddr_ll;
 }
 
-//Function used to send message using raw socket
-void NeighborManager::send_ethernet_msg(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> dest_mac,struct neighbor_payload payload) {
-    struct ethhdr eh = init_ethhdr(source_mac,dest_mac);
-    uint8_t buf[128];
-
-    int ifindex = 2;//for now hardcoded
-
-    struct sockaddr_ll saddr_ll = {};
-    saddr_ll.sll_family   = AF_PACKET;
-    saddr_ll.sll_ifindex = ifindex;
-    saddr_ll.sll_halen = ETH_ALEN;
-    saddr_ll.sll_protocol = htons(ETH_P_NEIGHBOR);
-    memcpy(saddr_ll.sll_addr, dest_mac.data(), ETH_ALEN);
-
-    int s = create_ethernet_socket();
-
-    /* construct a packet */
-    memcpy(buf, &eh, sizeof(eh));
-    memcpy(buf + sizeof(eh),&payload,sizeof(payload));
-
-    int errno;
-    int frame_size = sizeof(eh) + sizeof(payload);
-    int n = sendto(s, buf, frame_size, 0, (struct sockaddr *)&saddr_ll, sizeof(saddr_ll));
-
-
-
-    std::cout << "Sendto result " << n << std::endl;
-    std::cout << "buf size" << sizeof(buf) << std::endl;
-    std::cout<< "payload size" << sizeof(payload) << std::endl;
-    std::cout << "socket " << s << std::endl;
-    std::cout << "errno " << errno << std::endl;
+void NeighborManager::socket_set_nonblock(int sock_fd) {
+    int flags = fcntl(sock_fd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("fcntl");
+    }
+    if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("fcntl");
+    }
 }
 
-int NeighborManager::create_broadcast_recv_socket(int ifindex) {
-    int rcv_sockfd, ret;
+//Function used to create a socket for broadcast recieval and bind it to specific interface
+int NeighborManager::create_broadcast_recv_socket() {
 
-    struct sockaddr_ll ll{};
+    /*struct sockaddr_ll ll{};
     ll.sll_family = AF_PACKET;
     ll.sll_halen = ETH_ALEN;
-    ll.sll_ifindex = ifindex;
+    ll.sll_ifindex = ifindex;*/
 
-    rcv_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
-
+    recv_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
+    socket_set_nonblock(recv_sockfd);
+    /*
     //Close the socket and return -1 if unable to bind.
     if (bind(rcv_sockfd, (struct sockaddr *)&ll, sizeof(ll)) == -1) {
         perror("bind");
         close(rcv_sockfd);
         return -1;
     }
+    */
 
-    return rcv_sockfd;
+    return recv_sockfd;
 
+}
+
+int NeighborManager::create_broadcast_send_socket() {
+    send_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
+    socket_set_nonblock(send_sockfd);
+    return send_sockfd;
+}
+
+//Function used to send message using raw socket
+void NeighborManager::send_broadcast(int ifindex, int sockfd, std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> dest_mac,struct neighbor_payload payload) {
+    uint8_t buf[128];
+    struct ethhdr eh = init_ethhdr(source_mac,dest_mac);
+    struct sockaddr_ll saddr_ll = init_sockaddr_ll(ifindex,dest_mac);
+
+    //construct a packet
+    memcpy(buf, &eh, sizeof(eh));
+    memcpy(buf + sizeof(eh),&payload,sizeof(payload));
+    const int frame_size = sizeof(eh) + sizeof(payload);
+
+    //send msg
+    const ssize_t n = sendto(sockfd, buf, frame_size, 0, (struct sockaddr *)&saddr_ll, sizeof(saddr_ll));
+    if (n == -1) {
+        //In case if kernel buffer is full
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            std::cerr<<"Kernel buffer full\n";
+            return;
+        }
+        perror("sendto");
+    }
+    if (n != frame_size) {
+        std::cerr<<"Neighbor frame not sent completely\n";
+    }
 }
 
 void NeighborManager::recv_broadcast(int rcv_sockfd) {
@@ -146,9 +150,13 @@ void NeighborManager::recv_broadcast(int rcv_sockfd) {
     struct sockaddr_ll ll{};
     socklen_t sockaddr_len = sizeof(ll);
 
-    std::time_t rcv_time = std::time(nullptr);
+    std::chrono::time_point<std::chrono::steady_clock> rcv_time = std::chrono::steady_clock::now();
     len = recvfrom(rcv_sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&ll, &sockaddr_len);
     if (len < 0) {
+        //In case if nothing to recieve don't throw errors
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return;
+        }
         perror("recv");
         return;
     }
@@ -196,9 +204,11 @@ void NeighborManager::recv_broadcast(int rcv_sockfd) {
         neigh_conn.ip_family = 0;
     }
 
-    active_neighbors[ifname] = neigh_conn;
+    //store the connection
+    active_neighbors[neigh_conn.neighbor_id].active_connections[ifindex] = neigh_conn;
+    //active_neighbors[ifname] = neigh_conn;
 }
-
+/*
 void NeighborManager::recv_ethernet_msg() {
     int len;
     int rcv_sock, ret;
@@ -280,3 +290,4 @@ void NeighborManager::recv_ethernet_msg() {
     printf("ip_family: %d\n", pyld.ip_family);
     //std::cout << "recieved ip_family " <<pyld.ip_family << std::endl;
 }
+*/

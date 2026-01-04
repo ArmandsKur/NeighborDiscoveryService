@@ -24,11 +24,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctime>
+#include <chrono>
 
 #include <array>
+#include <map>
 #include <unordered_map>
-#include <unistd.h>
-#include "interface.h"
 
 #define ETH_P_NEIGHBOR 0x88B5 //used one of the Local Experimental Ethertype
 #define P_NEIGHBOR_SIZE 53 //define the size of total payload for neighbor protocol packet
@@ -45,12 +45,18 @@ struct neighbor_payload {
 };
 #pragma pack(pop)
 
+//Store active connections for each neighbor ID
+struct active_neighbors {
+    std::unordered_map<int,struct neighbor_connection> active_connections;
+};
+
 //For each connection, display the local interface name, neighbor's MAC address in that specific network, and neighbor's IP address in that network (or indicate if none exists)
 struct neighbor_connection {
     std::array<uint8_t, 16> neighbor_id;
     uint8_t  mac_addr[6];
     std::string local_ifname;
-    std::time_t last_seen;
+    //std::time_t last_seen;
+    std::chrono::time_point<std::chrono::steady_clock> last_seen;
     uint8_t  ip_family;       // AF_INET / AF_INET6 / 0
     union {
         struct in_addr  ipv4;
@@ -63,17 +69,24 @@ struct neighbor_connection {
 class NeighborManager {
     public:
         NeighborManager();
-        int create_ethernet_socket();
-        int create_broadcast_recv_socket(int ifindex);
+        int create_broadcast_recv_socket();
+        int create_broadcast_send_socket();
         void recv_broadcast(int rcv_sockfd);
-        void send_ethernet_msg(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> des_mac,struct neighbor_payload payload);
-        void recv_ethernet_msg();
+        void send_broadcast(int ifindex, int sockfd, std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> des_mac,struct neighbor_payload payload);
     private:
-        int eth_socket;
-        std::unordered_map<std::string,struct neighbor_connection> active_neighbors;
+        //Socket fds
+        int send_sockfd;
+        int recv_sockfd;
+
+        std::map<std::array<uint8_t, 16>,struct active_neighbors> active_neighbors;
+
         std::array<uint8_t, 16> client_id;
         std::array<uint8_t, 16> get_random_client_id();
+
         const std::array<uint8_t, 6> broadcast_mac = {0xFF,0xFF,0xFF,0xFF,0xFF};
+
+        //helpers
+        void socket_set_nonblock(int sock_fd);
         struct ethhdr init_ethhdr(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> dest_mac);
         struct sockaddr_ll init_sockaddr_ll(int ifindex, std::array<uint8_t, 6> dest_mac);
 

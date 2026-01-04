@@ -42,5 +42,6 @@ struct ethernet_interface {
     std::array<uint8_t, 6> mac_addr;
     std::vector<ip_address> ip_addresses;
     bool is_active;
+    bool is_loopback;
 };
 #endif //NEIGHBORDISCOVERYSERVICE_INTERFACE_H
