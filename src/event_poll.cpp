@@ -22,7 +22,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "event_poll.h"
+#include "neighbor_discovery/event_poll.h"
 
 //Function to insert new fds to pollfd vectoe and store role of fd in the pfd_role map
 void EventPoll::add_to_pfds(int new_fd, short events, PollFdRole role) {
@@ -60,9 +60,9 @@ void EventPoll::startup_netlink() {
         std::cerr << "Failed to open netlink socket\n";
     }
     add_to_pfds(netlink_fd, POLLIN, PollFdRole::Netlink);
-    if_mngr.do_getlink_dump(netlink_fd);
-    if_mngr.do_getaddr_dump(netlink_fd);
-    if_mngr.socket_set_nonblock(netlink_fd);
+    if_mngr.do_getlink_dump();
+    if_mngr.do_getaddr_dump();
+    if_mngr.socket_set_nonblock();
 }
 
 //Function to create sockets for neighbor manager and store their fds in pdfs vector

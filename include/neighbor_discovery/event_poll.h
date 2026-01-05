@@ -24,8 +24,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "neighbor_manager.h"
-#include "interface_manager.h"
+#include "neighbor_discovery/neighbor_manager.h"
+#include "neighbor_discovery/interface_manager.h"
 
 enum class PollFdRole {
     Netlink,
@@ -45,7 +45,7 @@ class EventPoll{
 
     private:
         //Variables related to storing fds used in the poll
-        std::vector<struct pollfd> pfds;
+        std::vector<pollfd> pfds;
         std::unordered_map<int,PollFdRole> pfd_role;
         nfds_t fd_count = 0;
         //Variables related to neighbor management

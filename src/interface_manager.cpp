@@ -24,13 +24,13 @@
 #include <unordered_map>
 #include <errno.h>
 
-#include "interface.h"
-#include "interface_manager.h"
-#include "neighbor_manager.h"
+#include "neighbor_discovery/interface.h"
+#include "neighbor_discovery/interface_manager.h"
+#include "neighbor_discovery/neighbor_manager.h"
 
 //Function used to create netlink socket and return its fd
 int InterfaceManager::open_netlink_socket() {
-    struct sockaddr_nl sa;
+    sockaddr_nl sa{};
     netlink_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
     if (netlink_fd != -1) {
         memset(&sa, 0, sizeof(sa));
@@ -38,7 +38,7 @@ int InterfaceManager::open_netlink_socket() {
         sa.nl_groups = RTMGRP_LINK |
                        RTMGRP_IPV4_IFADDR |
                        RTMGRP_IPV6_IFADDR;
-        bind(netlink_fd, (struct sockaddr*)&sa, sizeof(sa));
+        bind(netlink_fd, (sockaddr*)&sa, sizeof(sa));
 
         return netlink_fd;
     } else {
@@ -51,7 +51,7 @@ int InterfaceManager::open_netlink_socket() {
  *Function used to perform initial getlink dump which
  *Done so the interface_list can be filled with interface data
  */
-void InterfaceManager::do_getlink_dump(int netlink_fd) {
+void InterfaceManager::do_getlink_dump() {
     int len;
     char buffer[8192];
     int getlink_dump_seq = 1;
@@ -75,7 +75,7 @@ void InterfaceManager::do_getlink_dump(int netlink_fd) {
     while (!is_dump_done) {
 
         len = recv(netlink_fd, &buffer, sizeof(buffer), 0);
-        for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+        for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_seq != getlink_dump_seq)
                 continue;
             if (nlh->nlmsg_type == NLMSG_DONE) {
@@ -96,16 +96,16 @@ void InterfaceManager::do_getlink_dump(int netlink_fd) {
     }
 }
 //Same idea as with getlink, just for IP addresses
-void InterfaceManager::do_getaddr_dump(int netlink_fd) {
+void InterfaceManager::do_getaddr_dump() {
     int len;
     char buffer[8192];
     int getaddr_dump_seq = 2;
     //Create struct to send getaddr dump request
     struct {
-        struct nlmsghdr nlh;
-        struct ifinfomsg ifm;
+        nlmsghdr nlh;
+        ifinfomsg ifm;
     } req;
-    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(ifinfomsg));
     req.nlh.nlmsg_type = RTM_GETADDR;
     req.nlh.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
     req.nlh.nlmsg_seq = getaddr_dump_seq;
@@ -119,7 +119,7 @@ void InterfaceManager::do_getaddr_dump(int netlink_fd) {
     while (!is_dump_done) {
 
         len = recv(netlink_fd, &buffer, sizeof(buffer), 0);
-        for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+        for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_seq != getaddr_dump_seq)
                 continue;
             if (nlh->nlmsg_type == NLMSG_DONE) {
@@ -140,7 +140,7 @@ void InterfaceManager::do_getaddr_dump(int netlink_fd) {
     }
 }
 
-void InterfaceManager::socket_set_nonblock(int netlink_fd) {
+void InterfaceManager::socket_set_nonblock() {
     int flags = fcntl(netlink_fd, F_GETFL, 0);
     if (flags == -1) {
         perror("fcntl");

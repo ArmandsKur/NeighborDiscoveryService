@@ -22,14 +22,16 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "event_poll.h"
-#include "interface_manager.h"
-#include "neighbor_manager.h"
+#include "neighbor_discovery/event_poll.h"
+#include "neighbor_discovery/interface_manager.h"
+#include "neighbor_discovery/neighbor_manager.h"
 
 
 /*
- * NeighborDiscovery service must be ran as superuser, in other creation of
+ * NeighborDiscovery service must be ran with root privileges
+ * otherwise won't be able to create raw sockets
  */
+
 int main() {
     std::cout<<"main"<<std::endl;
     int work = 0;

@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "neighbor_manager.h"
+#include "neighbor_discovery/neighbor_manager.h"
 #include <bitset>
 
 NeighborManager::NeighborManager() {
@@ -61,7 +61,7 @@ std::array<uint8_t, 16> NeighborManager::get_random_client_id() {
 }
 
 //Function used to return initialized ethhdr struct
-struct ethhdr NeighborManager::init_ethhdr(std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> dest_mac) {
+struct ethhdr NeighborManager::init_ethhdr(std::array<uint8_t,6> source_mac, std::array<uint8_t,6> dest_mac) {
     struct ethhdr eh{};
     std::memcpy(eh.h_source, source_mac.data(), ETH_ALEN);
     std::memcpy(eh.h_dest, dest_mac.data(), ETH_ALEN);
@@ -69,7 +69,7 @@ struct ethhdr NeighborManager::init_ethhdr(std::array<uint8_t, 6> source_mac,std
     return eh;
 }
 //Function used to initialize sockaddr_ll struct.
-struct sockaddr_ll NeighborManager::init_sockaddr_ll(int ifindex, std::array<uint8_t, 6> dest_mac) {
+struct sockaddr_ll NeighborManager::init_sockaddr_ll(int ifindex, std::array<uint8_t,6> dest_mac) {
     sockaddr_ll saddr_ll{};
     saddr_ll.sll_family   = AF_PACKET;
     saddr_ll.sll_ifindex = ifindex;
@@ -118,7 +118,7 @@ int NeighborManager::create_broadcast_send_socket() {
     return send_sockfd;
 }
 
-neighbor_payload NeighborManager::construct_neighbor_payload(std::array<uint8_t,6>  source_mac,ip_address ip_addr) {
+neighbor_payload NeighborManager::construct_neighbor_payload(std::array<uint8_t,6> source_mac, ip_address ip_addr) {
     neighbor_payload payload{};
     memcpy(payload.client_id, client_id.data(), client_id.size());
     memcpy(payload.mac_addr, source_mac.data(), ETH_ALEN);
@@ -134,7 +134,7 @@ neighbor_payload NeighborManager::construct_neighbor_payload(std::array<uint8_t,
 }
 
 //Function used to send message using raw socket
-void NeighborManager::send_broadcast(int ifindex, std::array<uint8_t, 6> source_mac, struct neighbor_payload payload) {
+void NeighborManager::send_broadcast(int ifindex, std::array<uint8_t,6> source_mac, neighbor_payload payload) {
     uint8_t buf[128];
     struct ethhdr eh = init_ethhdr(source_mac,broadcast_mac);
     struct sockaddr_ll saddr_ll = init_sockaddr_ll(ifindex,broadcast_mac);
@@ -236,7 +236,7 @@ void NeighborManager::recv_broadcast() {
     }
 
     //store the connection
-    active_neighbors[neigh_conn.neighbor_id].active_connections[ifindex] = neigh_conn;
+    neighbors[neigh_conn.neighbor_id].active_connections[ifindex] = neigh_conn;
     //active_neighbors[ifname] = neigh_conn;
 
     std::cout<<"neigh_conn.local_ifname: "<<neigh_conn.local_ifname<<std::endl;

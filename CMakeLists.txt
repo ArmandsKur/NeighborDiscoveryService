@@ -3,14 +3,23 @@ project(NeighborDiscoveryService)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(NeighborDiscoveryService main.cpp
-        interface_manager.cpp
-        interface_manager.h
-        event_poll.cpp
-        event_poll.h
-        interface.h
-        neighbor_manager.cpp
-        neighbor_manager.h)
+include_directories(include)
+
+add_library(neighbor_lib
+        src/interface_manager.cpp
+        src/event_poll.cpp
+        src/neighbor_manager.cpp
+        include/neighbor_discovery/interface_manager.h
+        include/neighbor_discovery/event_poll.h
+        include/neighbor_discovery/interface.h
+        include/neighbor_discovery/neighbor_manager.h
+)
+
+add_executable(NeighborDiscoveryService
+        apps/neighbor_service.cpp
+)
+
+target_link_libraries(NeighborDiscoveryService neighbor_lib)
 
 # Grant raw socket capabilities after build
 add_custom_command(TARGET NeighborDiscoveryService POST_BUILD
