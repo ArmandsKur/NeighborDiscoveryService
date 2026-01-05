@@ -83,13 +83,11 @@ void EventPoll::startup_neighbor_manager() {
 //Function used to run main event poll which will handle all the activities
 void EventPoll::run_event_poll() {
     int ready;
-    /*
-    //test chrono
-    std::chrono::time_point<std::chrono::steady_clock> last_packet_sent = std::chrono::steady_clock::now();
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(end - last_packet_sent);
-    std::cout<< "Slow calculations took " << time_span.count() << std::endl;
-    */
+
+    //Init time_point variables
+    std::chrono::time_point<std::chrono::steady_clock> last_packet_time{};
+    std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
+    std::cout<<"fd count: "<<fd_count<<std::endl;
     while (fd_count > 0) {
         ready = poll(pfds.data(), fd_count, -1);
         if (ready == -1)
@@ -100,11 +98,32 @@ void EventPoll::run_event_poll() {
                 continue;
             }
             if (pfd_role[pfd.fd] == PollFdRole::Netlink) {
-                if_mngr.handle_netlink_event(pfd);
+                if (pfd.revents & POLLIN) {
+                    if_mngr.handle_netlink_event();
+                }
             } else if (pfd_role[pfd.fd] == PollFdRole::PacketRecv) {
-
+                if (pfd.revents & POLLIN) {
+                    std::cout<<"Broadcast recieved\n";
+                    neighbor_mngr.recv_broadcast();
+                }
             } else if (pfd_role[pfd.fd] == PollFdRole::PacketSend) {
+                now = std::chrono::steady_clock::now();
+                //Send broadcast only each 5 seconds
+                if (now - last_packet_time >= std::chrono::seconds(5)) {
 
+                    //std::cout<<"did stuff each 5 seconds\n";
+                    for (auto& it: if_mngr.get_interface_list()) {
+                        auto interface = it.second;
+                        neighbor_payload payload = neighbor_mngr.construct_neighbor_payload(
+                            interface.mac_addr,
+                            if_mngr.get_ip_address(interface)
+                        );
+                        if (interface.is_active && !interface.is_loopback) {
+                            neighbor_mngr.send_broadcast(interface.ifindex,interface.mac_addr,payload);
+                        }
+                    }
+                    last_packet_time = now;
+                }
             }
             /*
             if (pfd.revents & POLLIN) {

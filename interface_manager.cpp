@@ -150,58 +150,56 @@ void InterfaceManager::socket_set_nonblock(int netlink_fd) {
     }
 }
 
-void InterfaceManager::handle_netlink_event(pollfd pfd) {
-    if (pfd.revents & POLLIN) {
-        char buffer[8192];
-        struct iovec iov = {buffer,sizeof(buffer)};
-        struct sockaddr_nl sa;
-        struct msghdr msg = {&sa,sizeof(sa),&iov,1};
+void InterfaceManager::handle_netlink_event() {
+    char buffer[8192];
+    struct iovec iov = {buffer,sizeof(buffer)};
+    struct sockaddr_nl sa;
+    struct msghdr msg = {&sa,sizeof(sa),&iov,1};
 
-        ssize_t len = recvmsg(pfd.fd, &msg, 0);
-        //Stop reading if error on recvmsg
-        if (len < 0) {
-            //In case if nothing to read then don't print any errors
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                return;
-            }
-            perror("recvmsg");
+    ssize_t len = recvmsg(netlink_fd, &msg, 0);
+    //Stop reading if error on recvmsg
+    if (len < 0) {
+        //In case if nothing to read then don't print any errors
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return;
         }
+        perror("recvmsg");
+        return;
+    }
 
-        //Handle only kernel messages
-        if (sa.nl_pid != 0)
-            return;
+    //Handle only kernel messages
+    if (sa.nl_pid != 0)
+        return;
 
-        for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
-            if (nlh->nlmsg_type == NLMSG_DONE)
+    for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+        if (nlh->nlmsg_type == NLMSG_DONE)
+            break;
+
+        if (nlh->nlmsg_type == NLMSG_ERROR) {
+            std::cerr << "Netlink error\n";
+            continue;
+        }
+
+        if (nlh->nlmsg_seq != 0)
+            continue;
+
+        switch (nlh->nlmsg_type) {
+            case RTM_NEWLINK:
+                std::cout << "RTM_NEWLINK" << std::endl;
+                handle_newlink(nlh);
                 break;
-
-            if (nlh->nlmsg_type == NLMSG_ERROR) {
-                std::cerr << "Netlink error\n";
-                continue;
-            }
-
-            if (nlh->nlmsg_seq != 0)
-                continue;
-
-            switch (nlh->nlmsg_type) {
-                case RTM_NEWLINK:
-                    std::cout << "RTM_NEWLINK" << std::endl;
-                    handle_newlink(nlh);
-                    break;
-                case RTM_DELLINK:
-                    std::cout << "RTM_DELLINK" << std::endl;
-                    handle_dellink(nlh);
-                    break;
-                case RTM_NEWADDR:
-                    std::cout << "RTM_NEWADDR" << std::endl;
-                    handle_newaddr(nlh);
-                    break;
-                case RTM_DELADDR:
-                    std::cout << "RTM_DELADDR" << std::endl;
-                    handle_deladdr(nlh);
-                    break;
-            }
+            case RTM_DELLINK:
+                std::cout << "RTM_DELLINK" << std::endl;
+                handle_dellink(nlh);
+                break;
+            case RTM_NEWADDR:
+                std::cout << "RTM_NEWADDR" << std::endl;
+                handle_newaddr(nlh);
+                break;
+            case RTM_DELADDR:
+                std::cout << "RTM_DELADDR" << std::endl;
+                handle_deladdr(nlh);
+                break;
         }
     }
 }
@@ -348,4 +346,25 @@ void InterfaceManager::handle_deladdr(struct nlmsghdr *nlh) {
         }
         rta = RTA_NEXT(rta, rtl);
     }
+}
+
+//Return ip address with priority for IPv4
+ip_address InterfaceManager::get_ip_address(const ethernet_interface& interface) {
+    ip_address ipv6{};
+    bool found_ipv6 = false;
+    for (auto& ip_addr:interface.ip_addresses) {
+        if (ip_addr.family == AF_INET) {
+            return ip_addr;
+        }
+        if (ip_addr.family == AF_INET6 && !found_ipv6) {
+            ipv6 = ip_addr;
+            found_ipv6 = true;
+        }
+    }
+    //If no ip addresses return blank ip address sturct
+    return ipv6;
+}
+
+std::unordered_map<int, ethernet_interface> InterfaceManager::get_interface_list() {
+    return interface_list;
 }

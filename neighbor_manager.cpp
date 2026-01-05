@@ -118,19 +118,50 @@ int NeighborManager::create_broadcast_send_socket() {
     return send_sockfd;
 }
 
+neighbor_payload NeighborManager::construct_neighbor_payload(std::array<uint8_t,6>  source_mac,ip_address ip_addr) {
+    neighbor_payload payload{};
+    memcpy(payload.client_id, client_id.data(), client_id.size());
+    memcpy(payload.mac_addr, source_mac.data(), ETH_ALEN);
+    //Fill IP address in case if there is any
+    payload.ip_family = ip_addr.family;
+    if (payload.ip_family == AF_INET) {
+        payload.ipv4 = ip_addr.ipv4;
+    } else if (payload.ip_family == AF_INET6) {
+        payload.ipv6 = ip_addr.ipv6;
+    }
+
+    return payload;
+}
+
 //Function used to send message using raw socket
-void NeighborManager::send_broadcast(int ifindex, int sockfd, std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> dest_mac,struct neighbor_payload payload) {
+void NeighborManager::send_broadcast(int ifindex, std::array<uint8_t, 6> source_mac, struct neighbor_payload payload) {
     uint8_t buf[128];
-    struct ethhdr eh = init_ethhdr(source_mac,dest_mac);
-    struct sockaddr_ll saddr_ll = init_sockaddr_ll(ifindex,dest_mac);
+    struct ethhdr eh = init_ethhdr(source_mac,broadcast_mac);
+    struct sockaddr_ll saddr_ll = init_sockaddr_ll(ifindex,broadcast_mac);
 
     //construct a packet
     memcpy(buf, &eh, sizeof(eh));
     memcpy(buf + sizeof(eh),&payload,sizeof(payload));
     const int frame_size = sizeof(eh) + sizeof(payload);
+    /*
+    std::cout<<"ifindex: "<<ifindex<<std::endl;
 
+    printf("broadcast_mac: %02x:%02x:%02x:%02x:%02x:%02x\n",
+             broadcast_mac[0], broadcast_mac[1], broadcast_mac[2],
+             broadcast_mac[3], broadcast_mac[4], broadcast_mac[5]);
+
+    printf("source_mac: %02x:%02x:%02x:%02x:%02x:%02x\n",
+             source_mac[0], source_mac[1], source_mac[2],
+             source_mac[3], source_mac[4], source_mac[5]);
+
+    printf("payload mac_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+             payload.mac_addr[0], payload.mac_addr[1], payload.mac_addr[2],
+             payload.mac_addr[3], payload.mac_addr[4], payload.mac_addr[5]);
+
+    std::cout<<"ip_address "<<inet_ntoa(payload.ipv4)<<std::endl;
+    */
     //send msg
-    const ssize_t n = sendto(sockfd, buf, frame_size, 0, (struct sockaddr *)&saddr_ll, sizeof(saddr_ll));
+    const ssize_t n = sendto(send_sockfd, buf, frame_size, 0, (struct sockaddr *)&saddr_ll, sizeof(saddr_ll));
     if (n == -1) {
         //In case if kernel buffer is full
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -144,14 +175,14 @@ void NeighborManager::send_broadcast(int ifindex, int sockfd, std::array<uint8_t
     }
 }
 
-void NeighborManager::recv_broadcast(int rcv_sockfd) {
+void NeighborManager::recv_broadcast() {
     ssize_t len;
     uint8_t buf[P_NEIGHBOR_SIZE];
     struct sockaddr_ll ll{};
     socklen_t sockaddr_len = sizeof(ll);
 
     std::chrono::time_point<std::chrono::steady_clock> rcv_time = std::chrono::steady_clock::now();
-    len = recvfrom(rcv_sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&ll, &sockaddr_len);
+    len = recvfrom(recv_sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&ll, &sockaddr_len);
     if (len < 0) {
         //In case if nothing to recieve don't throw errors
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -207,6 +238,26 @@ void NeighborManager::recv_broadcast(int rcv_sockfd) {
     //store the connection
     active_neighbors[neigh_conn.neighbor_id].active_connections[ifindex] = neigh_conn;
     //active_neighbors[ifname] = neigh_conn;
+
+    std::cout<<"neigh_conn.local_ifname: "<<neigh_conn.local_ifname<<std::endl;
+
+    printf("neighbor_pyld.client_id: %02x:%02x:%02x:%02x:%02x:%02x\n",
+             neighbor_pyld.client_id[0], neighbor_pyld.client_id[1], neighbor_pyld.client_id[2],
+             neighbor_pyld.client_id[3], neighbor_pyld.client_id[4], neighbor_pyld.client_id[5]);
+
+    printf("neighbor_pyld.mac_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+             neighbor_pyld.mac_addr[0], neighbor_pyld.mac_addr[1], neighbor_pyld.mac_addr[2],
+             neighbor_pyld.mac_addr[3], neighbor_pyld.mac_addr[4], neighbor_pyld.mac_addr[5]);
+
+    if (neigh_conn.ip_family == AF_INET) {
+        std::cout<<"ip_address_v4 "<<inet_ntoa(neigh_conn.ipv4)<<std::endl;
+    } else if (neigh_conn.ip_family == AF_INET6) {
+        printf("ip_address_v6: %02x:%02x:%02x:%02x:%02x:%02x\n",
+             neigh_conn.ipv6.s6_addr[0], neigh_conn.ipv6.s6_addr[1], neigh_conn.ipv6.s6_addr[2],
+             neigh_conn.ipv6.s6_addr[3], neigh_conn.ipv6.s6_addr[4], neigh_conn.ipv6.s6_addr[5]);
+    }
+
+
 }
 /*
 void NeighborManager::recv_ethernet_msg() {

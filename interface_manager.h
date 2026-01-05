@@ -11,13 +11,16 @@ class InterfaceManager {
         void do_getlink_dump(int netlink_fd);
         void do_getaddr_dump(int netlink_fd);
         void socket_set_nonblock(int netlink_fd);
-        void handle_netlink_event(pollfd pfd);
-        void handle_newlink(struct nlmsghdr* nlh);
-        void handle_dellink(struct nlmsghdr* nlh);
-        void handle_newaddr(struct nlmsghdr* nlh);
-        void handle_deladdr(struct nlmsghdr* nlh);
-        void add_address(int ifindex, struct ip_address);
-        void del_address(int ifindex, struct ip_address);
+        void handle_netlink_event();
+        void handle_newlink(nlmsghdr* nlh);
+        void handle_dellink(nlmsghdr* nlh);
+        void handle_newaddr(nlmsghdr* nlh);
+        void handle_deladdr(nlmsghdr* nlh);
+        void add_address(int ifindex, ip_address);
+        void del_address(int ifindex, ip_address);
+        ip_address get_ip_address(const ethernet_interface& interface);
+
+        std::unordered_map<int,ethernet_interface> get_interface_list();
 
     private:
         std::unordered_map<int,ethernet_interface> interface_list;

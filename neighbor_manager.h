@@ -30,6 +30,8 @@
 #include <map>
 #include <unordered_map>
 
+#include "interface.h"
+
 #define ETH_P_NEIGHBOR 0x88B5 //used one of the Local Experimental Ethertype
 #define P_NEIGHBOR_SIZE 53 //define the size of total payload for neighbor protocol packet
 
@@ -71,8 +73,9 @@ class NeighborManager {
         NeighborManager();
         int create_broadcast_recv_socket();
         int create_broadcast_send_socket();
-        void recv_broadcast(int rcv_sockfd);
-        void send_broadcast(int ifindex, int sockfd, std::array<uint8_t, 6> source_mac,std::array<uint8_t, 6> des_mac,struct neighbor_payload payload);
+        neighbor_payload construct_neighbor_payload(std::array<uint8_t,6>  source_mac,ip_address ip_addr);
+        void recv_broadcast();
+        void send_broadcast(int ifindex, std::array<uint8_t, 6> source_mac,struct neighbor_payload payload);
     private:
         //Socket fds
         int send_sockfd;
@@ -83,7 +86,7 @@ class NeighborManager {
         std::array<uint8_t, 16> client_id;
         std::array<uint8_t, 16> get_random_client_id();
 
-        const std::array<uint8_t, 6> broadcast_mac = {0xFF,0xFF,0xFF,0xFF,0xFF};
+        const std::array<uint8_t, 6> broadcast_mac = {0xff,0xff,0xff,0xff,0xff,0xff};
 
         //helpers
         void socket_set_nonblock(int sock_fd);

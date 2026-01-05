@@ -28,7 +28,7 @@
 #include <vector>
 
 struct ip_address {
-    sa_family_t family;
+    sa_family_t family = 0;
 
     union {
         in_addr ipv4;
