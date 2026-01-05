@@ -1,30 +1,16 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
-#include <cstring>
 #include <sys/types.h>
 #include <ifaddrs.h>
 #include <sys/socket.h>
-#include <linux/if_packet.h>
-#include <net/ethernet.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <netinet/ether.h>
-#include <linux/if_packet.h>
-#include <asm/types.h>
-#include <sys/socket.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
 #include <poll.h>
-#include <unistd.h>
 #include <fcntl.h>
 
 #include "neighbor_discovery/event_poll.h"
 
-//Function to insert new fds to pollfd vectoe and store role of fd in the pfd_role map
+//Function to insert new fds to pollfd vector and store role of fd in the pfd_role map
 void EventPoll::add_to_pfds(int new_fd, short events, PollFdRole role) {
     pollfd new_pollfd;
     new_pollfd.fd = new_fd;
@@ -83,11 +69,9 @@ void EventPoll::startup_neighbor_manager() {
 //Function used to run main event poll which will handle all the activities
 void EventPoll::run_event_poll() {
     int ready;
-
     //Init time_point variables
     std::chrono::time_point<std::chrono::steady_clock> last_packet_time{};
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
-    std::cout<<"fd count: "<<fd_count<<std::endl;
     while (fd_count > 0) {
         ready = poll(pfds.data(), fd_count, -1);
         if (ready == -1)
@@ -110,8 +94,7 @@ void EventPoll::run_event_poll() {
                 now = std::chrono::steady_clock::now();
                 //Send broadcast only each 5 seconds
                 if (now - last_packet_time >= std::chrono::seconds(5)) {
-
-                    //std::cout<<"did stuff each 5 seconds\n";
+                    //Send broadcast message trough each active interface
                     for (auto& it: if_mngr.get_interface_list()) {
                         auto interface = it.second;
                         neighbor_payload payload = neighbor_mngr.construct_neighbor_payload(
@@ -125,56 +108,6 @@ void EventPoll::run_event_poll() {
                     last_packet_time = now;
                 }
             }
-            /*
-            if (pfd.revents & POLLIN) {
-                char buffer[8192];
-                struct iovec iov = {buffer,sizeof(buffer)};
-                struct sockaddr_nl sa;
-                struct msghdr msg = {&sa,sizeof(sa),&iov,1};
-
-                ssize_t len = recvmsg(pfd.fd, &msg, 0);
-                //Stop reading if error on recvmsg
-                if (len < 0) {
-                    perror("recvmsg");
-                    break;
-                }
-
-                //Handle only kernel messages
-                if (sa.nl_pid != 0)
-                    continue;
-
-                for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
-                    if (nlh->nlmsg_type == NLMSG_DONE)
-                        break;
-
-                    if (nlh->nlmsg_type == NLMSG_ERROR) {
-                        std::cerr << "Netlink error\n";
-                        continue;
-                    }
-
-                    if (nlh->nlmsg_seq != 0)
-                        continue;
-
-                    switch (nlh->nlmsg_type) {
-                        case RTM_NEWLINK:
-                            std::cout << "RTM_NEWLINK" << std::endl;
-                            if_mngr.handle_newlink(nlh);
-                            break;
-                        case RTM_DELLINK:
-                            std::cout << "RTM_DELLINK" << std::endl;
-                            if_mngr.handle_dellink(nlh);
-                            break;
-                        case RTM_NEWADDR:
-                            std::cout << "RTM_NEWADDR" << std::endl;
-                            if_mngr.handle_newaddr(nlh);
-                            break;
-                        case RTM_DELADDR:
-                            std::cout << "RTM_DELADDR" << std::endl;
-                            if_mngr.handle_deladdr(nlh);
-                            break;
-                    }
-                }
-            }*/
         }
     }
 }

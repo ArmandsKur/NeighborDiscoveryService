@@ -21,8 +21,13 @@ add_executable(NeighborDiscoveryService
 
 target_link_libraries(NeighborDiscoveryService neighbor_lib)
 
+add_executable(NeighborCli apps/neighbor_cli.cpp)
+
+target_link_libraries(NeighborCli neighbor_lib)
+
 # Grant raw socket capabilities after build
 add_custom_command(TARGET NeighborDiscoveryService POST_BUILD
         COMMAND sudo setcap cap_net_raw+ep $<TARGET_FILE:NeighborDiscoveryService>
         COMMENT "Setting CAP_NET_RAW capability"
 )
+
