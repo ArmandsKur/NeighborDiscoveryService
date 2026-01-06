@@ -35,6 +35,7 @@ enum class PollFdRole {
 
 class EventPoll{
     public:
+        void startup();
         void startup_netlink();
         void startup_neighbor_manager();
         void run_event_poll();
@@ -48,11 +49,11 @@ class EventPoll{
         std::vector<pollfd> pfds;
         std::unordered_map<int,PollFdRole> pfd_role;
         nfds_t fd_count = 0;
-        //Variables related to neighbor management
+
+        //Manager classes
         NeighborManager neighbor_mngr;
-        //Variables related to netlink
         InterfaceManager if_mngr;
-        //int netlink_fd; //Now just stored in if_mngr
+
 
 
 };

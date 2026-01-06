@@ -1,3 +1,5 @@
+#ifndef NEIGHBORDISCOVERYSERVICE_CLI_MANAGER_H
+#define NEIGHBORDISCOVERYSERVICE_CLI_MANAGER_H
 #include <algorithm>
 #include <iostream>
 #include <vector>
@@ -27,15 +29,18 @@
 #include <errno.h>
 #include <sys/un.h>
 
+#include "client_manager.h"
+
 #define NAME "NeighborDiscoveryService"
 
-int main() {
-    int unix_socket = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (unix_socket == -1) {
-        perror("unix_socket");
-        return -1;
-    }
-
-
-
-}
+class ClientManager {
+    public:
+        int open_listen_socket();
+        int open_data_socket();
+    private:
+        int listen_socket;
+        int data_socket;
+        sockaddr_un init_sockaddr_un();
+        void socket_set_nonblock(int sock_fd);
+};
+#endif //NEIGHBORDISCOVERYSERVICE_CLI_MANAGER_H

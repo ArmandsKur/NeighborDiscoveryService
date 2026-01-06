@@ -13,6 +13,8 @@ add_library(neighbor_lib
         include/neighbor_discovery/event_poll.h
         include/neighbor_discovery/interface.h
         include/neighbor_discovery/neighbor_manager.h
+        src/client_manager.cpp
+        include/neighbor_discovery/client_manager.h
 )
 
 add_executable(NeighborDiscoveryService

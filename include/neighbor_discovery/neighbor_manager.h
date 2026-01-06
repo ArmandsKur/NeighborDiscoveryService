@@ -70,17 +70,20 @@ struct neighbor_connection {
 
 class NeighborManager {
     public:
-        NeighborManager();
-        int create_broadcast_recv_socket();
-        int create_broadcast_send_socket();
+        int init();
+        int get_broadcast_recv_socket();
+        int get_broadcast_send_socket();
+
         neighbor_payload construct_neighbor_payload(std::array<uint8_t,6> source_mac,ip_address ip_addr);
-        void recv_broadcast();
+        void recv_broadcast(const std::unordered_map<int,ethernet_interface> &interface_list);
         void send_broadcast(int ifindex, std::array<uint8_t,6> source_mac, neighbor_payload payload);
     private:
         const std::array<uint8_t, 6> broadcast_mac = {0xff,0xff,0xff,0xff,0xff,0xff};
         //Socket fds
         int send_sockfd;
         int recv_sockfd;
+        int create_broadcast_recv_socket();
+        int create_broadcast_send_socket();
 
         std::map<std::array<uint8_t,16>, active_neighbor> neighbors;
 

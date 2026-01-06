@@ -29,9 +29,15 @@
 #include "neighbor_discovery/neighbor_manager.h"
 #include <bitset>
 
-NeighborManager::NeighborManager() {
+int NeighborManager::init() {
     client_id = get_random_client_id();
+    if (create_broadcast_recv_socket() == -1)
+        return -1;
+    if (create_broadcast_send_socket() == -1)
+        return -1;
+    return 0;
 }
+
 
 
 /*
@@ -162,6 +168,7 @@ void NeighborManager::send_broadcast(int ifindex, std::array<uint8_t,6> source_m
     */
     //send msg
     const ssize_t n = sendto(send_sockfd, buf, frame_size, 0, (struct sockaddr *)&saddr_ll, sizeof(saddr_ll));
+
     if (n == -1) {
         //In case if kernel buffer is full
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -175,7 +182,7 @@ void NeighborManager::send_broadcast(int ifindex, std::array<uint8_t,6> source_m
     }
 }
 
-void NeighborManager::recv_broadcast() {
+void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_interface> &interface_list) {
     ssize_t len;
     uint8_t buf[P_NEIGHBOR_SIZE];
     struct sockaddr_ll ll{};
@@ -198,6 +205,19 @@ void NeighborManager::recv_broadcast() {
     if (!if_indextoname(ifindex, ifname)) {
         perror("if_indextoname");
         return;
+    }
+
+    /*
+     * Check if interface to which broadcase is recieved is active
+     * If not then ignore the payload
+     */
+    auto it = interface_list.find(ifindex);
+    if (it == interface_list.end()) {
+        std::cerr<<"Interface not found\n";
+        return;
+    } else {
+        if (!it->second.is_active)
+            return;
     }
 
     //Check that correct protocol packet was received
@@ -257,88 +277,11 @@ void NeighborManager::recv_broadcast() {
              neigh_conn.ipv6.s6_addr[3], neigh_conn.ipv6.s6_addr[4], neigh_conn.ipv6.s6_addr[5]);
     }
 
-
 }
-/*
-void NeighborManager::recv_ethernet_msg() {
-    int len;
-    int rcv_sock, ret;
-    uint8_t buf[P_NEIGHBOR_SIZE];
 
-    struct sockaddr_ll ll{};
-    ll.sll_family = AF_PACKET;
-    ll.sll_halen = ETH_ALEN;
-    ll.sll_ifindex = 2;
-
-    rcv_sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
-    std::cout << "recv ethernet msg socket" << rcv_sock << std::endl;
-
-    ret = bind(rcv_sock, (struct sockaddr *) &ll, sizeof(ll));
-    if (ret == -1) {
-        perror("bind");
-        exit(1);
-    }
-
-    while(1) {
-        len = recvfrom(rcv_sock, buf, sizeof(buf), 0, NULL, NULL);
-        if (len < 0)
-        {
-            perror("recv");
-        }
-        printf("received bytes = %d\n", len);
-        break;
-
-
-    }
-
-    std::cout<<"Bits: "<<std::endl;
-    for (auto b : buf) {
-        std::cout << std::bitset<8>(b) << ' ';
-    }
-    std::cout << '\n';
-
-    const ethhdr* eth = (ethhdr*)buf;
-    if(eth->h_proto == htons(ETH_P_NEIGHBOR)) {
-        std::cout << "received correct protocol" << std::endl;
-    } else {
-        std::cout << "received incorrect protocol" << std::endl;
-    }
-
-    const uint8_t* payload = buf + sizeof(struct ethhdr);
-    size_t payload_len = len - sizeof(struct ethhdr);
-
-    std::cout << "payload len: " << payload_len << std::endl;
-    if (payload_len < sizeof(neighbor_payload)) {
-        std::cerr << "payload too short\n";
-        return;
-    }
-    std::cout << "proto raw: 0x"<< std::hex << ntohs(eth->h_proto) << std::dec << "\n";
-
-    neighbor_payload pyld;
-    std::memcpy(&pyld, payload, sizeof(pyld));
-
-
-    //const neighbor_payload* pyld = (neighbor_payload*)payload;
-    std::cout << "pyld raw: 0x"<< std::hex << pyld.client_id << std::dec << "\n";
-    std::cout << "pyld client_id[0]: " << pyld.client_id[0] << std::endl;
-
-    std::cout << "client_id: ";
-    for (int i = 0; i < 16; ++i) {
-        printf("%02x", pyld.client_id[i]);
-    }
-    std::cout << "\n";
-
-    std::cout << "recieved client_id" << std::endl;
-    printf("mac_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
-             pyld.client_id[0], pyld.client_id[1], pyld.client_id[2],
-             pyld.client_id[3], pyld.client_id[4], pyld.client_id[5]);
-
-    std::cout << "recieved mac_addr" << std::endl;
-    printf("mac_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
-             pyld.mac_addr[0], pyld.mac_addr[1], pyld.mac_addr[2],
-             pyld.mac_addr[3], pyld.mac_addr[4], pyld.mac_addr[5]);
-
-    printf("ip_family: %d\n", pyld.ip_family);
-    //std::cout << "recieved ip_family " <<pyld.ip_family << std::endl;
+int NeighborManager::get_broadcast_recv_socket() {
+    return recv_sockfd;
 }
-*/
+int NeighborManager::get_broadcast_send_socket() {
+    return send_sockfd;
+}

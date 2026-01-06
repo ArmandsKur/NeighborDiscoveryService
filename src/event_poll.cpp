@@ -50,7 +50,16 @@ void EventPoll::startup_netlink() {
     if_mngr.do_getaddr_dump();
     if_mngr.socket_set_nonblock();
 }
+void EventPoll::startup() {
+    if(neighbor_mngr.init() == -1) {
+        std::cerr << "Failed to initialize neighbor manager\n";
+        return;
+    }
+    add_to_pfds(neighbor_mngr.get_broadcast_recv_socket(), POLLIN, PollFdRole::PacketRecv);
+    add_to_pfds(neighbor_mngr.get_broadcast_send_socket(), POLLOUT, PollFdRole::PacketSend);
 
+}
+/*
 //Function to create sockets for neighbor manager and store their fds in pdfs vector
 void EventPoll::startup_neighbor_manager() {
     int recv_fd = neighbor_mngr.create_broadcast_recv_socket();
@@ -65,7 +74,7 @@ void EventPoll::startup_neighbor_manager() {
         return;
     }
     add_to_pfds(send_fd, POLLOUT, PollFdRole::PacketSend);
-}
+}*/
 //Function used to run main event poll which will handle all the activities
 void EventPoll::run_event_poll() {
     int ready;
@@ -88,7 +97,7 @@ void EventPoll::run_event_poll() {
             } else if (pfd_role[pfd.fd] == PollFdRole::PacketRecv) {
                 if (pfd.revents & POLLIN) {
                     std::cout<<"Broadcast recieved\n";
-                    neighbor_mngr.recv_broadcast();
+                    neighbor_mngr.recv_broadcast(if_mngr.get_interface_list());
                 }
             } else if (pfd_role[pfd.fd] == PollFdRole::PacketSend) {
                 now = std::chrono::steady_clock::now();
