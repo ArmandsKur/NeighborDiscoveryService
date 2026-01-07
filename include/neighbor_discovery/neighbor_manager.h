@@ -70,7 +70,7 @@ struct neighbor_connection {
 
 class NeighborManager {
     public:
-        int init();
+        bool init();
         int get_broadcast_recv_socket();
         int get_broadcast_send_socket();
 

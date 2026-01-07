@@ -29,13 +29,13 @@
 #include "neighbor_discovery/neighbor_manager.h"
 #include <bitset>
 
-int NeighborManager::init() {
+bool NeighborManager::init() {
     client_id = get_random_client_id();
     if (create_broadcast_recv_socket() == -1)
-        return -1;
+        return false;
     if (create_broadcast_send_socket() == -1)
-        return -1;
-    return 0;
+        return false;
+    return true;
 }
 
 
@@ -209,7 +209,9 @@ void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_inter
 
     /*
      * Check if interface to which broadcase is recieved is active
-     * If not then ignore the payload
+     * If not then ignore the payload.
+     * Packets which get queued in the virtual switch during the downtime of interface
+     * have to be ignored.
      */
     auto it = interface_list.find(ifindex);
     if (it == interface_list.end()) {

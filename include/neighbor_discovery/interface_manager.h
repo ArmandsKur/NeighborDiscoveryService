@@ -7,24 +7,29 @@ class NeighborManager;
 
 class InterfaceManager {
     public:
-        int open_netlink_socket();
-        void do_getlink_dump();
-        void do_getaddr_dump();
-        void socket_set_nonblock();
+        bool init();
         void handle_netlink_event();
+
+        int get_netlink_socket();
+        ip_address get_ip_address(const ethernet_interface& interface);
+        std::unordered_map<int,ethernet_interface> get_interface_list();
+
+    private:
+        std::unordered_map<int,ethernet_interface> interface_list;
+        int netlink_fd;
+        //init steps
+        int open_netlink_socket();
+        bool do_getlink_dump();
+        bool do_getaddr_dump();
+        bool socket_set_nonblock();
+        //functions for proccessing netlink messages
         void handle_newlink(nlmsghdr* nlh);
         void handle_dellink(nlmsghdr* nlh);
         void handle_newaddr(nlmsghdr* nlh);
         void handle_deladdr(nlmsghdr* nlh);
         void add_address(int ifindex, ip_address);
         void del_address(int ifindex, ip_address);
-        ip_address get_ip_address(const ethernet_interface& interface);
 
-        std::unordered_map<int,ethernet_interface> get_interface_list();
-
-    private:
-        std::unordered_map<int,ethernet_interface> interface_list;
-        int netlink_fd;
 
 
 };

@@ -28,6 +28,33 @@
 #include "neighbor_discovery/interface_manager.h"
 #include "neighbor_discovery/neighbor_manager.h"
 
+bool InterfaceManager::init() {
+    netlink_fd = open_netlink_socket();
+    if (netlink_fd == -1) {
+        std::cerr << "Failed to open netlink socket\n";
+        return false;
+    }
+    if (!do_getlink_dump()) {
+        std::cerr << "Failed to do getlink dump\n";
+        return false;
+    }
+    if (!do_getaddr_dump()) {
+        std::cerr << "Failed to do getaddr dump\n";
+        return false;
+    }
+    //set socket nonblock is separate because dumps are blocking
+    if (!socket_set_nonblock()) {
+        std::cerr << "Failed to set netlink socket nonblock\n";
+        return false;
+    }
+    return true;
+}
+
+int InterfaceManager::get_netlink_socket() {
+    return netlink_fd;
+}
+
+
 //Function used to create netlink socket and return its fd
 int InterfaceManager::open_netlink_socket() {
     sockaddr_nl sa{};
@@ -51,7 +78,7 @@ int InterfaceManager::open_netlink_socket() {
  *Function used to perform initial getlink dump which
  *Done so the interface_list can be filled with interface data
  */
-void InterfaceManager::do_getlink_dump() {
+bool InterfaceManager::do_getlink_dump() {
     int len;
     char buffer[8192];
     int getlink_dump_seq = 1;
@@ -75,6 +102,10 @@ void InterfaceManager::do_getlink_dump() {
     while (!is_dump_done) {
 
         len = recv(netlink_fd, &buffer, sizeof(buffer), 0);
+        if (len == -1) {
+            perror("recv");
+            return false;
+        }
         for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_seq != getlink_dump_seq)
                 continue;
@@ -84,8 +115,7 @@ void InterfaceManager::do_getlink_dump() {
             }
             if (nlh->nlmsg_type == NLMSG_ERROR) {
                 std::cerr << "Netlink error\n";
-                is_dump_done = true;
-                break;
+                return false;
             }
             if (nlh->nlmsg_type == RTM_NEWLINK) {
                 std::cout<<"RTM_NEWLINK"<<std::endl;
@@ -94,9 +124,10 @@ void InterfaceManager::do_getlink_dump() {
 
         }
     }
+    return true;
 }
 //Same idea as with getlink, just for IP addresses
-void InterfaceManager::do_getaddr_dump() {
+bool InterfaceManager::do_getaddr_dump() {
     int len;
     char buffer[8192];
     int getaddr_dump_seq = 2;
@@ -119,6 +150,10 @@ void InterfaceManager::do_getaddr_dump() {
     while (!is_dump_done) {
 
         len = recv(netlink_fd, &buffer, sizeof(buffer), 0);
+        if (len == -1) {
+            perror("recv");
+            return false;
+        }
         for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_seq != getaddr_dump_seq)
                 continue;
@@ -128,8 +163,7 @@ void InterfaceManager::do_getaddr_dump() {
             }
             if (nlh->nlmsg_type == NLMSG_ERROR) {
                 std::cerr << "Netlink error\n";
-                is_dump_done = true;
-                break;
+                return false;
             }
             if (nlh->nlmsg_type == RTM_NEWADDR) {
                 std::cout<<"RTM_NEWADDR"<<std::endl;
@@ -138,16 +172,20 @@ void InterfaceManager::do_getaddr_dump() {
 
         }
     }
+    return true;
 }
 
-void InterfaceManager::socket_set_nonblock() {
+bool InterfaceManager::socket_set_nonblock() {
     int flags = fcntl(netlink_fd, F_GETFL, 0);
     if (flags == -1) {
         perror("fcntl");
+        return false;
     }
     if (fcntl(netlink_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
         perror("fcntl");
+        return false;
     }
+    return true;
 }
 
 void InterfaceManager::handle_netlink_event() {

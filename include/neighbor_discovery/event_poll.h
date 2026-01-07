@@ -35,7 +35,7 @@ enum class PollFdRole {
 
 class EventPoll{
     public:
-        void startup();
+        bool startup();
         void startup_netlink();
         void startup_neighbor_manager();
         void run_event_poll();

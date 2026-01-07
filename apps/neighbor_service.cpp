@@ -38,7 +38,7 @@ int main() {
     int work = 0;
 
     EventPoll event_poll;
-    event_poll.startup_netlink();
+    //event_poll.startup_netlink();
     event_poll.startup();
     //event_poll.startup_neighbor_manager();
     event_poll.run_event_poll();

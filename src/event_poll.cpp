@@ -14,7 +14,7 @@
 void EventPoll::add_to_pfds(int new_fd, short events, PollFdRole role) {
     pollfd new_pollfd;
     new_pollfd.fd = new_fd;
-    new_pollfd.events = events; //POLLIN
+    new_pollfd.events = events;
     new_pollfd.revents = 0;
 
     pfds.push_back(new_pollfd);
@@ -39,42 +39,27 @@ void EventPoll::del_from_pfds(int fd) {
     //erase fd from unordered map
     pfd_role.erase(fd);
 }
-//Function used to initialize netlink activities
-void EventPoll::startup_netlink() {
-    int netlink_fd = if_mngr.open_netlink_socket();
-    if (netlink_fd == -1) {
-        std::cerr << "Failed to open netlink socket\n";
+//Function used to initialize all managers used in event poll
+bool EventPoll::startup() {
+    //init interface manager
+    if (!if_mngr.init()) {
+        std::cerr << "Failed to initialize interface manager" << std::endl;
+        return false;
     }
-    add_to_pfds(netlink_fd, POLLIN, PollFdRole::Netlink);
-    if_mngr.do_getlink_dump();
-    if_mngr.do_getaddr_dump();
-    if_mngr.socket_set_nonblock();
-}
-void EventPoll::startup() {
-    if(neighbor_mngr.init() == -1) {
+    add_to_pfds(if_mngr.get_netlink_socket(), POLLIN, PollFdRole::Netlink);
+
+    //init neighbor manager
+    if(!neighbor_mngr.init()) {
         std::cerr << "Failed to initialize neighbor manager\n";
-        return;
+        return false;
     }
     add_to_pfds(neighbor_mngr.get_broadcast_recv_socket(), POLLIN, PollFdRole::PacketRecv);
     add_to_pfds(neighbor_mngr.get_broadcast_send_socket(), POLLOUT, PollFdRole::PacketSend);
 
+    return true;
+
 }
-/*
-//Function to create sockets for neighbor manager and store their fds in pdfs vector
-void EventPoll::startup_neighbor_manager() {
-    int recv_fd = neighbor_mngr.create_broadcast_recv_socket();
-    if (recv_fd == -1) {
-        std::cerr << "Failed to create broadcast recv socket\n";
-        return;
-    }
-    add_to_pfds(recv_fd, POLLIN, PollFdRole::PacketRecv);
-    int send_fd = neighbor_mngr.create_broadcast_send_socket();
-    if (send_fd == -1) {
-        std::cerr << "Failed to create broadcast send socket\n";
-        return;
-    }
-    add_to_pfds(send_fd, POLLOUT, PollFdRole::PacketSend);
-}*/
+
 //Function used to run main event poll which will handle all the activities
 void EventPoll::run_event_poll() {
     int ready;
