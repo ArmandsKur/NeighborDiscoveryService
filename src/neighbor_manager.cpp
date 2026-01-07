@@ -218,3 +218,7 @@ int NeighborManager::get_broadcast_recv_socket() {
 int NeighborManager::get_broadcast_send_socket() {
     return send_sockfd;
 }
+
+std::map<std::array<uint8_t, 16>, active_neighbor> NeighborManager::get_active_neighbors() {
+    return neighbors;
+}

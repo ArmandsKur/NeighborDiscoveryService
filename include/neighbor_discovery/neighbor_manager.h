@@ -55,7 +55,8 @@ struct active_neighbor {
 //For each connection, display the local interface name, neighbor's MAC address in that specific network, and neighbor's IP address in that network (or indicate if none exists)
 struct neighbor_connection {
     std::array<uint8_t,16> neighbor_id;
-    uint8_t  mac_addr[6];
+    //uint8_t  mac_addr[6];
+    std::array<uint8_t,6> mac_addr;
     std::string local_ifname;
     //std::time_t last_seen;
     std::chrono::time_point<std::chrono::steady_clock> last_seen;
@@ -77,6 +78,8 @@ class NeighborManager {
         neighbor_payload construct_neighbor_payload(std::array<uint8_t,6> source_mac,ip_address ip_addr);
         void recv_broadcast(const std::unordered_map<int,ethernet_interface> &interface_list);
         void send_broadcast(int ifindex, std::array<uint8_t,6> source_mac, neighbor_payload payload);
+
+        std::map<std::array<uint8_t,16>, active_neighbor> get_active_neighbors();
     private:
         const std::array<uint8_t, 6> broadcast_mac = {0xff,0xff,0xff,0xff,0xff,0xff};
         //Socket fds

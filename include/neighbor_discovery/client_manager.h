@@ -29,18 +29,25 @@
 #include <errno.h>
 #include <sys/un.h>
 
-#include "client_manager.h"
+#include "neighbor_discovery/neighbor_manager.h"
 
-#define NAME "NeighborDiscoveryService"
+#define NAME "/tmp/NeighborDiscoveryService.sock"
 
 class ClientManager {
     public:
-        int open_listen_socket();
+        bool init();
+        int get_listen_socket();
         int open_data_socket();
+        bool get_conn_status();
+        void write_message(neighbor_payload payload);
+        void end_message();
+        void close_data_socket();
     private:
         int listen_socket;
         int data_socket;
+        bool connected = false;
         sockaddr_un init_sockaddr_un();
+        int open_listen_socket();
         void socket_set_nonblock(int sock_fd);
 };
 #endif //NEIGHBORDISCOVERYSERVICE_CLI_MANAGER_H

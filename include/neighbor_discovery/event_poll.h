@@ -26,11 +26,13 @@
 
 #include "neighbor_discovery/neighbor_manager.h"
 #include "neighbor_discovery/interface_manager.h"
+#include "neighbor_discovery/client_manager.h"
 
 enum class PollFdRole {
     Netlink,
     PacketRecv,
-    PacketSend
+    PacketSend,
+    UnixListen
 };
 
 class EventPoll{
@@ -53,6 +55,7 @@ class EventPoll{
         //Manager classes
         NeighborManager neighbor_mngr;
         InterfaceManager if_mngr;
+        ClientManager client_mngr;
 
 
 
