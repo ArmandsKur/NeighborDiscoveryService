@@ -33,13 +33,15 @@
 
 #define NAME "/tmp/NeighborDiscoveryService.sock"
 
+
+
 class ClientManager {
     public:
         bool init();
         int get_listen_socket();
         int open_data_socket();
         bool get_conn_status();
-        void write_message(neighbor_payload payload);
+        void write_message(cli_neighbor_payload payload);
         void end_message();
         void close_data_socket();
     private:

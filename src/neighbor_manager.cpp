@@ -212,6 +212,22 @@ void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_inter
 
 }
 
+cli_neighbor_payload NeighborManager::construct_cli_neighbor_payload(neighbor_connection conn) {
+    cli_neighbor_payload payload{};
+    memcpy(payload.local_ifname, conn.local_ifname.data(), conn.local_ifname.size());
+    memcpy(payload.client_id, conn.neighbor_id.data(), conn.neighbor_id.size());
+    memcpy(payload.mac_addr, conn.mac_addr.data(), ETH_ALEN);
+    //Fill IP address in case if there is any
+    payload.ip_family = conn.ip_family;
+    if (payload.ip_family == AF_INET) {
+        payload.ipv4 = conn.ipv4;
+    } else if (payload.ip_family == AF_INET6) {
+        payload.ipv6 = conn.ipv6;
+    }
+
+    return payload;
+}
+
 int NeighborManager::get_broadcast_recv_socket() {
     return recv_sockfd;
 }

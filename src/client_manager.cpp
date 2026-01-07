@@ -78,7 +78,8 @@ bool ClientManager::get_conn_status() {
     return connected;
 }
 
-void ClientManager::write_message(neighbor_payload payload) {
+
+void ClientManager::write_message(cli_neighbor_payload payload) {
     int n;
     uint8_t buf[128];
     memcpy(buf,&payload,sizeof(payload));

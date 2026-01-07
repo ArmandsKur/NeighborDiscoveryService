@@ -119,7 +119,9 @@ void EventPoll::run_event_poll() {
                 for (auto& neighbor: neighbor_mngr.get_active_neighbors()) {
                     auto active_connections = neighbor.second.active_connections;
                     for (auto& connection: active_connections) {
-
+                        cli_neighbor_payload payload = neighbor_mngr.construct_cli_neighbor_payload(connection.second);
+                        client_mngr.write_message(payload);
+                        /*
                         ip_address neighbor_ip{};
                         neighbor_ip.family = connection.second.ip_family;
                         if (neighbor_ip.family == AF_INET) {
@@ -131,7 +133,7 @@ void EventPoll::run_event_poll() {
                         neighbor_payload payload = neighbor_mngr.construct_neighbor_payload(
                             connection.second.mac_addr,
                             neighbor_ip
-                        );
+                        );*/
 
                         std::cout<<"unix payload sent\n";
 

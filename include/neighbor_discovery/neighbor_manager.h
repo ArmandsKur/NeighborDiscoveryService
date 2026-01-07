@@ -47,6 +47,19 @@ struct neighbor_payload {
 };
 #pragma pack(pop)
 
+#pragma pack(push, 1)
+struct cli_neighbor_payload {
+    char local_ifname[IFNAMSIZ];
+    uint8_t  client_id[16];
+    uint8_t  mac_addr[6];
+    uint8_t  ip_family;       // AF_INET / AF_INET6 / 0
+    union {
+        struct in_addr  ipv4;
+        struct in6_addr ipv6;
+    };
+};
+#pragma pack(pop)
+
 //Store active connections for each neighbor ID
 struct active_neighbor {
     std::unordered_map<int,struct neighbor_connection> active_connections;
@@ -68,7 +81,6 @@ struct neighbor_connection {
 };
 
 
-
 class NeighborManager {
     public:
         bool init();
@@ -76,6 +88,7 @@ class NeighborManager {
         int get_broadcast_send_socket();
 
         neighbor_payload construct_neighbor_payload(std::array<uint8_t,6> source_mac,ip_address ip_addr);
+        cli_neighbor_payload construct_cli_neighbor_payload(neighbor_connection);
         void recv_broadcast(const std::unordered_map<int,ethernet_interface> &interface_list);
         void send_broadcast(int ifindex, std::array<uint8_t,6> source_mac, neighbor_payload payload);
 
