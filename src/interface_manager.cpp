@@ -1,32 +1,5 @@
-#include <algorithm>
-#include <iostream>
-#include <vector>
-#include <cstring>
-#include <sys/types.h>
-#include <ifaddrs.h>
-#include <sys/socket.h>
-#include <linux/if_packet.h>
-#include <net/ethernet.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <netinet/ether.h>
-#include <linux/if_packet.h>
-#include <asm/types.h>
-#include <sys/socket.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <poll.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <unordered_map>
-#include <errno.h>
-
 #include "neighbor_discovery/interface.h"
 #include "neighbor_discovery/interface_manager.h"
-#include "neighbor_discovery/neighbor_manager.h"
 
 bool InterfaceManager::init() {
     netlink_fd = open_netlink_socket();
@@ -276,12 +249,11 @@ void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
         if (rta->rta_type == IFLA_ADDRESS) {
             auto mac_addr = static_cast<uint8_t *>(RTA_DATA(rta));
             std::memcpy(interface_list[ifindex].mac_addr.data(), RTA_DATA(rta), 6);
-            char buf[18];
-            snprintf(buf, sizeof(buf),
-                     "%02x:%02x:%02x:%02x:%02x:%02x",
-                     mac_addr[0], mac_addr[1], mac_addr[2],
-                     mac_addr[3], mac_addr[4], mac_addr[5]);
-            std::cout << "MAC address: " << buf << std::endl;
+
+            printf("MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+                mac_addr[0], mac_addr[1], mac_addr[2],
+                mac_addr[3], mac_addr[4], mac_addr[5]
+            );
         }
         rta = RTA_NEXT(rta, rtl);
     }

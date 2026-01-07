@@ -1,33 +1,4 @@
-#include <algorithm>
-#include <iostream>
-#include <vector>
-#include <cstring>
-#include <sys/types.h>
-#include <ifaddrs.h>
-#include <sys/socket.h>
-#include <linux/if_packet.h>
-#include <net/ethernet.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <netinet/ether.h>
-#include <linux/if_packet.h>
-#include <asm/types.h>
-#include <sys/socket.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <poll.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <ctime>
-#include <array>
-#include <unistd.h>
-#include <errno.h>
-
 #include "neighbor_discovery/neighbor_manager.h"
-#include <bitset>
 
 bool NeighborManager::init() {
     client_id = get_random_client_id();
@@ -57,12 +28,6 @@ std::array<uint8_t, 16> NeighborManager::get_random_client_id() {
     std::array<uint8_t, 16> id{};
     getentropy(client_id.data(), length);
 
-    char buf[18];
-    snprintf(buf, sizeof(buf),
-             "%02x:%02x:%02x:%02x:%02x:%02x",
-             client_id[0], client_id[1], client_id[2],
-             client_id[3], client_id[4], client_id[5]);
-    std::cout << "Client id: " << buf << std::endl;
     return client_id;
 }
 
@@ -97,25 +62,9 @@ void NeighborManager::socket_set_nonblock(int sock_fd) {
 
 //Function used to create a socket for broadcast recieval and bind it to specific interface
 int NeighborManager::create_broadcast_recv_socket() {
-
-    /*struct sockaddr_ll ll{};
-    ll.sll_family = AF_PACKET;
-    ll.sll_halen = ETH_ALEN;
-    ll.sll_ifindex = ifindex;*/
-
     recv_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
     socket_set_nonblock(recv_sockfd);
-    /*
-    //Close the socket and return -1 if unable to bind.
-    if (bind(rcv_sockfd, (struct sockaddr *)&ll, sizeof(ll)) == -1) {
-        perror("bind");
-        close(rcv_sockfd);
-        return -1;
-    }
-    */
-
     return recv_sockfd;
-
 }
 
 int NeighborManager::create_broadcast_send_socket() {
@@ -149,26 +98,9 @@ void NeighborManager::send_broadcast(int ifindex, std::array<uint8_t,6> source_m
     memcpy(buf, &eh, sizeof(eh));
     memcpy(buf + sizeof(eh),&payload,sizeof(payload));
     const int frame_size = sizeof(eh) + sizeof(payload);
-    /*
-    std::cout<<"ifindex: "<<ifindex<<std::endl;
 
-    printf("broadcast_mac: %02x:%02x:%02x:%02x:%02x:%02x\n",
-             broadcast_mac[0], broadcast_mac[1], broadcast_mac[2],
-             broadcast_mac[3], broadcast_mac[4], broadcast_mac[5]);
-
-    printf("source_mac: %02x:%02x:%02x:%02x:%02x:%02x\n",
-             source_mac[0], source_mac[1], source_mac[2],
-             source_mac[3], source_mac[4], source_mac[5]);
-
-    printf("payload mac_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
-             payload.mac_addr[0], payload.mac_addr[1], payload.mac_addr[2],
-             payload.mac_addr[3], payload.mac_addr[4], payload.mac_addr[5]);
-
-    std::cout<<"ip_address "<<inet_ntoa(payload.ipv4)<<std::endl;
-    */
     //send msg
     const ssize_t n = sendto(send_sockfd, buf, frame_size, 0, (struct sockaddr *)&saddr_ll, sizeof(saddr_ll));
-
     if (n == -1) {
         //In case if kernel buffer is full
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -259,10 +191,9 @@ void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_inter
 
     //store the connection
     neighbors[neigh_conn.neighbor_id].active_connections[ifindex] = neigh_conn;
-    //active_neighbors[ifname] = neigh_conn;
 
+    //Print recieved neighbor info
     std::cout<<"neigh_conn.local_ifname: "<<neigh_conn.local_ifname<<std::endl;
-
     printf("neighbor_pyld.client_id: %02x:%02x:%02x:%02x:%02x:%02x\n",
              neighbor_pyld.client_id[0], neighbor_pyld.client_id[1], neighbor_pyld.client_id[2],
              neighbor_pyld.client_id[3], neighbor_pyld.client_id[4], neighbor_pyld.client_id[5]);

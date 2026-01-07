@@ -1,13 +1,3 @@
-#include <algorithm>
-#include <iostream>
-#include <vector>
-#include <sys/types.h>
-#include <ifaddrs.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <poll.h>
-#include <fcntl.h>
-
 #include "neighbor_discovery/event_poll.h"
 
 //Function to insert new fds to pollfd vector and store role of fd in the pfd_role map

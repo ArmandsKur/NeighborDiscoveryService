@@ -86,7 +86,6 @@ class NeighborManager {
         int create_broadcast_send_socket();
 
         std::map<std::array<uint8_t,16>, active_neighbor> neighbors;
-
         std::array<uint8_t,16> client_id;
         std::array<uint8_t,16> get_random_client_id();
 
