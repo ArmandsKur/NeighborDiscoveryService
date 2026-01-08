@@ -109,5 +109,15 @@ void ClientManager::close_data_socket() {
     connected = false;
 }
 
+void ClientManager::cleanup() {
+    if (data_socket > 0) {
+        close(data_socket);
+    }
+    if (listen_socket > 0) {
+        close(listen_socket);
+    }
+    unlink(NAME);
+}
+
 
 

@@ -47,10 +47,11 @@ int main() {
     ret = connect(data_socket, (const struct sockaddr *) &name,sizeof(name));
     if (ret == -1) {
         perror("data_socket connect()");
+        return -1;
     }
 
     ssize_t len;
-    char buf[128];
+    char buf[sizeof(cli_neighbor_payload)];
     while (true) {
         /* Wait for next data packet. */
 
@@ -59,15 +60,16 @@ int main() {
             perror("read unix socket stream");
             return -1;
         }
-        if (len > 0) {
-            std::cout << "mssg len" << len << std::endl;
+
+        if (len < sizeof(cli_neighbor_payload)) {
+            std::cerr<<"recieved payload is less than expected\n";
+            return -1;
         }
 
         //Ensure buffer is 0-terminated
         buf[sizeof(buf) - 1] = 0;
 
-        if (!strncmp(buf, "END", sizeof(buf))) {
-            std::cout<<"End signal recieved\n";
+        if (!strncmp(buf, "END", 3)) {
             break;
         }
 
@@ -91,14 +93,5 @@ int main() {
                  neighbor_pyld.ipv6.s6_addr[0], neighbor_pyld.ipv6.s6_addr[1], neighbor_pyld.ipv6.s6_addr[2],
                  neighbor_pyld.ipv6.s6_addr[3], neighbor_pyld.ipv6.s6_addr[4], neighbor_pyld.ipv6.s6_addr[5]);
         }
-        /*
-        if (down_flag) {
-            continue;
-        }
-        */
-        /* Add received summand. */
-
-        //result += atoi(buffer);
     }
-
 }

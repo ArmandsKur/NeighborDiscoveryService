@@ -58,13 +58,26 @@ bool EventPoll::startup() {
 
 }
 
+//Perform graceful shutdown
+void EventPoll::shutdown() {
+    if_mngr.cleanup();
+
+
+    pfds.clear();
+    pfd_role.clear();
+    fd_count = 0;
+}
+
+
 //Function used to run main event poll which will handle all the activities
-void EventPoll::run_event_poll() {
+void EventPoll::run_event_poll(volatile const sig_atomic_t& keep_running) {
     int ready;
     //Init time_point variables
     std::chrono::time_point<std::chrono::steady_clock> last_packet_time{};
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
-    while (fd_count > 0) {
+
+    while (fd_count > 0 && keep_running) {
+
         ready = poll(pfds.data(), fd_count, -1);
         if (ready == -1)
             perror("poll");
@@ -73,13 +86,18 @@ void EventPoll::run_event_poll() {
             if (pfd.revents == 0) {
                 continue;
             }
+            //Stop if any error with poll events happen
+            if (pfd.revents & (POLLERR|POLLHUP|POLLNVAL)) {
+                std::cerr << "Poll error\n";
+                return;
+            }
+            
             if (pfd_role[pfd.fd] == PollFdRole::Netlink) {
                 if (pfd.revents & POLLIN) {
                     if_mngr.handle_netlink_event();
                 }
             } else if (pfd_role[pfd.fd] == PollFdRole::PacketRecv) {
                 if (pfd.revents & POLLIN) {
-                    std::cout<<"Broadcast recieved\n";
                     neighbor_mngr.recv_broadcast(if_mngr.get_interface_list());
                 }
             } else if (pfd_role[pfd.fd] == PollFdRole::PacketSend) {
@@ -110,10 +128,9 @@ void EventPoll::run_event_poll() {
                 if (client_mngr.get_conn_status())
                     continue;
 
-                std::cout<<"Unix connection request revieved\n";
                 int unix_fd = client_mngr.open_data_socket();
                 if (unix_fd == -1) {
-                    std::cout<<"Failed to open data socket\n";
+                    std::cerr<<"Failed to open data socket\n";
                 }
 
                 for (auto& neighbor: neighbor_mngr.get_active_neighbors()) {
@@ -121,32 +138,12 @@ void EventPoll::run_event_poll() {
                     for (auto& connection: active_connections) {
                         cli_neighbor_payload payload = neighbor_mngr.construct_cli_neighbor_payload(connection.second);
                         client_mngr.write_message(payload);
-                        /*
-                        ip_address neighbor_ip{};
-                        neighbor_ip.family = connection.second.ip_family;
-                        if (neighbor_ip.family == AF_INET) {
-                            neighbor_ip.ipv4 = connection.second.ipv4;
-                        } else if (neighbor_ip.family == AF_INET6) {
-                            neighbor_ip.ipv6 = connection.second.ipv6;
-                        }
-
-                        neighbor_payload payload = neighbor_mngr.construct_neighbor_payload(
-                            connection.second.mac_addr,
-                            neighbor_ip
-                        );*/
-
-                        std::cout<<"unix payload sent\n";
-
-
                     }
                 }
-
                 client_mngr.end_message();
 
                 //when finished sending close data socket
-                del_from_pfds(pfd.fd);
                 client_mngr.close_data_socket();
-                std::cout<<"Unix connection closed\n";
             }
         }
     }

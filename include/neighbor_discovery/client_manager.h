@@ -44,6 +44,8 @@ class ClientManager {
         void write_message(cli_neighbor_payload payload);
         void end_message();
         void close_data_socket();
+
+        void cleanup();
     private:
         int listen_socket;
         int data_socket;

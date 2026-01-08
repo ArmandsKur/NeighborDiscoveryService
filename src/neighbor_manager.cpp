@@ -2,10 +2,14 @@
 
 bool NeighborManager::init() {
     client_id = get_random_client_id();
-    if (create_broadcast_recv_socket() == -1)
+    if (create_broadcast_recv_socket() == -1) {
+        std::cerr << "Failed to create broadcast recv socket" << std::endl;
         return false;
-    if (create_broadcast_send_socket() == -1)
+    }
+    if (create_broadcast_send_socket() == -1) {
+        std::cerr << "Failed to create broadcast send socket" << std::endl;
         return false;
+    }
     return true;
 }
 
@@ -26,13 +30,13 @@ bool NeighborManager::init() {
 std::array<uint8_t, 16> NeighborManager::get_random_client_id() {
     const size_t length = 16;
     std::array<uint8_t, 16> id{};
-    getentropy(client_id.data(), length);
+    getentropy(id.data(), length);
 
-    return client_id;
+    return id;
 }
 
 //Function used to return initialized ethhdr struct
-struct ethhdr NeighborManager::init_ethhdr(std::array<uint8_t,6> source_mac, std::array<uint8_t,6> dest_mac) {
+ethhdr NeighborManager::init_ethhdr(std::array<uint8_t,6> source_mac, std::array<uint8_t,6> dest_mac) {
     struct ethhdr eh{};
     std::memcpy(eh.h_source, source_mac.data(), ETH_ALEN);
     std::memcpy(eh.h_dest, dest_mac.data(), ETH_ALEN);
@@ -40,7 +44,7 @@ struct ethhdr NeighborManager::init_ethhdr(std::array<uint8_t,6> source_mac, std
     return eh;
 }
 //Function used to initialize sockaddr_ll struct.
-struct sockaddr_ll NeighborManager::init_sockaddr_ll(int ifindex, std::array<uint8_t,6> dest_mac) {
+sockaddr_ll NeighborManager::init_sockaddr_ll(int ifindex, std::array<uint8_t,6> dest_mac) {
     sockaddr_ll saddr_ll{};
     saddr_ll.sll_family   = AF_PACKET;
     saddr_ll.sll_ifindex = ifindex;
@@ -50,26 +54,45 @@ struct sockaddr_ll NeighborManager::init_sockaddr_ll(int ifindex, std::array<uin
     return saddr_ll;
 }
 
-void NeighborManager::socket_set_nonblock(int sock_fd) {
+bool NeighborManager::socket_set_nonblock(int sock_fd) {
     int flags = fcntl(sock_fd, F_GETFL, 0);
     if (flags == -1) {
         perror("fcntl");
+        return false;
     }
     if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
         perror("fcntl");
+        return false;
     }
+    return true;
 }
 
 //Function used to create a socket for broadcast recieval and bind it to specific interface
 int NeighborManager::create_broadcast_recv_socket() {
     recv_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
-    socket_set_nonblock(recv_sockfd);
+    if (recv_sockfd == -1) {
+        perror("create_broadcast_recv_socket");
+        return -1;
+    }
+    if (!socket_set_nonblock(recv_sockfd)) {
+        perror("set nonblock recv socket");
+        close(recv_sockfd);
+        return -1;
+    }
     return recv_sockfd;
 }
 
 int NeighborManager::create_broadcast_send_socket() {
     send_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_NEIGHBOR));
-    socket_set_nonblock(send_sockfd);
+    if (send_sockfd == -1) {
+        perror("create_broadcast_send_socket");
+        return -1;
+    }
+    if (!socket_set_nonblock(send_sockfd)) {
+        perror("set nonblock send socket");
+        close(recv_sockfd);
+        return -1;
+    }
     return send_sockfd;
 }
 
@@ -90,7 +113,7 @@ neighbor_payload NeighborManager::construct_neighbor_payload(std::array<uint8_t,
 
 //Function used to send message using raw socket
 void NeighborManager::send_broadcast(int ifindex, std::array<uint8_t,6> source_mac, neighbor_payload payload) {
-    uint8_t buf[128];
+    uint8_t buf[sizeof(ethhdr)+sizeof(neighbor_payload)];
     struct ethhdr eh = init_ethhdr(source_mac,broadcast_mac);
     struct sockaddr_ll saddr_ll = init_sockaddr_ll(ifindex,broadcast_mac);
 
@@ -116,7 +139,7 @@ void NeighborManager::send_broadcast(int ifindex, std::array<uint8_t,6> source_m
 
 void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_interface> &interface_list) {
     ssize_t len;
-    uint8_t buf[P_NEIGHBOR_SIZE];
+    uint8_t buf[sizeof(ethhdr)+sizeof(neighbor_payload)];
     struct sockaddr_ll ll{};
     socklen_t sockaddr_len = sizeof(ll);
 
@@ -238,3 +261,13 @@ int NeighborManager::get_broadcast_send_socket() {
 std::map<std::array<uint8_t, 16>, active_neighbor> NeighborManager::get_active_neighbors() {
     return neighbors;
 }
+
+void NeighborManager::cleanup() {
+    if (send_sockfd > 0) {
+        close(send_sockfd);
+    }
+    if (recv_sockfd > 0) {
+        close(recv_sockfd);
+    }
+}
+

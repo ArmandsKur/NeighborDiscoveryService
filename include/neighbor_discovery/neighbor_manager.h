@@ -3,27 +3,12 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
-#include <cstring>
 #include <sys/types.h>
 #include <ifaddrs.h>
 #include <sys/socket.h>
 #include <linux/if_packet.h>
-#include <net/ethernet.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <net/if.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <netinet/ether.h>
-#include <linux/if_packet.h>
-#include <asm/types.h>
-#include <sys/socket.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <poll.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <ctime>
 #include <chrono>
 
 #include <array>
@@ -65,13 +50,10 @@ struct active_neighbor {
     std::unordered_map<int,struct neighbor_connection> active_connections;
 };
 
-//For each connection, display the local interface name, neighbor's MAC address in that specific network, and neighbor's IP address in that network (or indicate if none exists)
 struct neighbor_connection {
     std::array<uint8_t,16> neighbor_id;
-    //uint8_t  mac_addr[6];
     std::array<uint8_t,6> mac_addr;
     std::string local_ifname;
-    //std::time_t last_seen;
     std::chrono::time_point<std::chrono::steady_clock> last_seen;
     uint8_t  ip_family;       // AF_INET / AF_INET6 / 0
     union {
@@ -93,6 +75,8 @@ class NeighborManager {
         void send_broadcast(int ifindex, std::array<uint8_t,6> source_mac, neighbor_payload payload);
 
         std::map<std::array<uint8_t,16>, active_neighbor> get_active_neighbors();
+
+        void cleanup();
     private:
         const std::array<uint8_t, 6> broadcast_mac = {0xff,0xff,0xff,0xff,0xff,0xff};
         //Socket fds
@@ -106,7 +90,7 @@ class NeighborManager {
         std::array<uint8_t,16> get_random_client_id();
 
         //helpers
-        void socket_set_nonblock(int sock_fd);
+        bool socket_set_nonblock(int sock_fd);
         ethhdr init_ethhdr(std::array<uint8_t,6> source_mac,std::array<uint8_t,6> dest_mac);
         sockaddr_ll init_sockaddr_ll(int ifindex, std::array<uint8_t,6> dest_mac);
 

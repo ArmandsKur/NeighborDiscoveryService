@@ -1,28 +1,7 @@
 #ifndef NEIGHBORDISCOVERYSERVICE_EVENT_POLL_H
 #define NEIGHBORDISCOVERYSERVICE_EVENT_POLL_H
-#include <algorithm>
-#include <iostream>
 #include <vector>
-#include <cstring>
-#include <sys/types.h>
-#include <ifaddrs.h>
-#include <sys/socket.h>
-#include <linux/if_packet.h>
-#include <net/ethernet.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <netinet/ether.h>
-#include <linux/if_packet.h>
-#include <asm/types.h>
-#include <sys/socket.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <poll.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include <signal.h>
 
 #include "neighbor_discovery/neighbor_manager.h"
 #include "neighbor_discovery/interface_manager.h"
@@ -38,9 +17,10 @@ enum class PollFdRole {
 class EventPoll{
     public:
         bool startup();
+        void shutdown();
         void startup_netlink();
         void startup_neighbor_manager();
-        void run_event_poll();
+        void run_event_poll(volatile const sig_atomic_t& keep_running);
 
         void add_to_pfds(int new_fd, short events, PollFdRole role);
         void del_from_pfds(int fd);

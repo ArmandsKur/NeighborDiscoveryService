@@ -378,3 +378,10 @@ ip_address InterfaceManager::get_ip_address(const ethernet_interface& interface)
 std::unordered_map<int, ethernet_interface> InterfaceManager::get_interface_list() {
     return interface_list;
 }
+
+void InterfaceManager::cleanup() {
+    if (netlink_fd > 0) {
+        close(netlink_fd);
+    }
+}
+

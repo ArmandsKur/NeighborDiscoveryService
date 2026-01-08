@@ -14,6 +14,8 @@ class InterfaceManager {
         ip_address get_ip_address(const ethernet_interface& interface);
         std::unordered_map<int,ethernet_interface> get_interface_list();
 
+        void cleanup();
+
     private:
         std::unordered_map<int,ethernet_interface> interface_list;
         int netlink_fd;
