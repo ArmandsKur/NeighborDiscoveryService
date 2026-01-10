@@ -128,14 +128,21 @@ void EventPoll::run_event_poll(volatile const sig_atomic_t& keep_running) {
                 if (client_mngr.get_conn_status())
                     continue;
 
+                /*Remove unactive connections just before outputting to CLI
+                * On 10K+ neighbours iterating trough each element becomes more painful
+                * And because most of the time you won't delete anything
+                * It's better to do it not often
+                */
+                neighbor_mngr.remove_unactive_connections();
+
                 int unix_fd = client_mngr.open_data_socket();
                 if (unix_fd == -1) {
                     std::cerr<<"Failed to open data socket\n";
                 }
 
-                for (auto& neighbor: neighbor_mngr.get_active_neighbors()) {
+                for (const auto& neighbor: neighbor_mngr.get_active_neighbors()) {
                     auto active_connections = neighbor.second.active_connections;
-                    for (auto& connection: active_connections) {
+                    for (const auto& connection: active_connections) {
                         cli_neighbor_payload payload = neighbor_mngr.construct_cli_neighbor_payload(connection.second);
                         client_mngr.write_message(payload);
                     }

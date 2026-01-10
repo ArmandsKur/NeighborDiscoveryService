@@ -12,7 +12,7 @@ class InterfaceManager {
 
         int get_netlink_socket();
         ip_address get_ip_address(const ethernet_interface& interface);
-        std::unordered_map<int,ethernet_interface> get_interface_list();
+        const std::unordered_map<int,ethernet_interface>& get_interface_list();
 
         void cleanup();
 
@@ -24,7 +24,7 @@ class InterfaceManager {
         bool do_getlink_dump();
         bool do_getaddr_dump();
         bool socket_set_nonblock();
-        //functions for proccessing netlink messages
+        //functions for processing netlink messages
         void handle_newlink(nlmsghdr* nlh);
         void handle_dellink(nlmsghdr* nlh);
         void handle_newaddr(nlmsghdr* nlh);

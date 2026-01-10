@@ -47,7 +47,7 @@ struct cli_neighbor_payload {
 
 //Store active connections for each neighbor ID
 struct active_neighbor {
-    std::unordered_map<int,struct neighbor_connection> active_connections;
+    std::map<int,struct neighbor_connection> active_connections;
 };
 
 struct neighbor_connection {
@@ -74,7 +74,9 @@ class NeighborManager {
         void recv_broadcast(const std::unordered_map<int,ethernet_interface> &interface_list);
         void send_broadcast(int ifindex, std::array<uint8_t,6> source_mac, neighbor_payload payload);
 
-        std::map<std::array<uint8_t,16>, active_neighbor> get_active_neighbors();
+        const std::map<std::array<uint8_t,16>, active_neighbor>& get_active_neighbors();
+
+        void remove_unactive_connections();
 
         void cleanup();
     private:

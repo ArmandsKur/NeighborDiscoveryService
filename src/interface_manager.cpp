@@ -32,19 +32,22 @@ int InterfaceManager::get_netlink_socket() {
 int InterfaceManager::open_netlink_socket() {
     sockaddr_nl sa{};
     netlink_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-    if (netlink_fd != -1) {
-        memset(&sa, 0, sizeof(sa));
-        sa.nl_family = AF_NETLINK;
-        sa.nl_groups = RTMGRP_LINK |
-                       RTMGRP_IPV4_IFADDR |
-                       RTMGRP_IPV6_IFADDR;
-        bind(netlink_fd, (sockaddr*)&sa, sizeof(sa));
-
-        return netlink_fd;
-    } else {
+    if (netlink_fd == -1) {
         perror("socket");
         return -1;
     }
+    memset(&sa, 0, sizeof(sa));
+    sa.nl_family = AF_NETLINK;
+    sa.nl_groups = RTMGRP_LINK |
+                   RTMGRP_IPV4_IFADDR |
+                   RTMGRP_IPV6_IFADDR;
+    if (bind(netlink_fd, (sockaddr*)&sa, sizeof(sa)) == -1) {
+        perror("bind netlink socket");
+        close(netlink_fd);
+        return -1;
+    }
+
+    return netlink_fd;
 }
 
 /*
@@ -56,7 +59,7 @@ bool InterfaceManager::do_getlink_dump() {
     char buffer[8192];
     int getlink_dump_seq = 1;
 
-    //Create struct to send getlink dump request
+    //Create request struct for getlink dump
     struct {
         struct nlmsghdr nlh;
         struct ifinfomsg ifm;
@@ -69,7 +72,10 @@ bool InterfaceManager::do_getlink_dump() {
     req.ifm.ifi_family = AF_UNSPEC;
 
 
-    send(netlink_fd, &req, sizeof(req), 0);
+    if (send(netlink_fd, &req, sizeof(req), 0) == -1) {
+        perror("send dump req");
+        return false;
+    }
 
     bool is_dump_done = false;
     while (!is_dump_done) {
@@ -79,7 +85,7 @@ bool InterfaceManager::do_getlink_dump() {
             perror("recv");
             return false;
         }
-        for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+        for (auto* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_seq != getlink_dump_seq)
                 continue;
             if (nlh->nlmsg_type == NLMSG_DONE) {
@@ -117,7 +123,10 @@ bool InterfaceManager::do_getaddr_dump() {
     req.ifm.ifi_family = AF_UNSPEC;
 
 
-    send(netlink_fd, &req, sizeof(req), 0);
+    if (send(netlink_fd, &req, sizeof(req), 0) == -1) {
+        perror("send dump req");
+        return false;
+    }
 
     bool is_dump_done = false;
     while (!is_dump_done) {
@@ -127,7 +136,7 @@ bool InterfaceManager::do_getaddr_dump() {
             perror("recv");
             return false;
         }
-        for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+        for (auto nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_seq != getaddr_dump_seq)
                 continue;
             if (nlh->nlmsg_type == NLMSG_DONE) {
@@ -182,17 +191,15 @@ void InterfaceManager::handle_netlink_event() {
     if (sa.nl_pid != 0)
         return;
 
-    for (struct nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
-        if (nlh->nlmsg_type == NLMSG_DONE)
+    for (auto nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+        if (nlh->nlmsg_type == NLMSG_DONE) {
             break;
+        }
 
         if (nlh->nlmsg_type == NLMSG_ERROR) {
             std::cerr << "Netlink error\n";
             continue;
         }
-
-        if (nlh->nlmsg_seq != 0)
-            continue;
 
         switch (nlh->nlmsg_type) {
             case RTM_NEWLINK:
@@ -238,7 +245,7 @@ void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
             auto ifname = static_cast<char *>((RTA_DATA(rta)));
             interface_list[ifindex].ifname = ifname;
             printf(
-                "ifname: %s, status: %s, i_runnning: %s, ifindex: %i\n",
+                "ifname: %s, status: %s, i_running: %s, ifindex: %i\n",
                 ifname,
                 if_up ? "up" : "down",
                 if_running ? "running" : "stopped",
@@ -277,11 +284,6 @@ void InterfaceManager::add_address(int ifindex, ip_address ip_addr) {
 }
 
 void InterfaceManager::del_address(int ifindex, ip_address ip_addr) {
-    /*
-    * Since on add_address I just push back without checking if it already exists
-    * We have to delete all the same addresses from vector in one go
-    * Probably not needed if RTM_NEWADDR comes only for unexistent addresses
-    */
     auto& ips = interface_list[ifindex].ip_addresses;
     ips.erase(
         std::remove_if(
@@ -292,9 +294,7 @@ void InterfaceManager::del_address(int ifindex, ip_address ip_addr) {
                     return ipaddr.ipv4.s_addr == ip_addr.ipv4.s_addr;
                 } else {
                     return std::memcmp(ipaddr.ipv6.s6_addr, ip_addr.ipv6.s6_addr, 16) == 0; //raw byte comparison
-                    //return ipaddr.ipv6.s6_addr == ip_addr.ipv6.s6_addr;
                 }
-                //return ipaddr.ipv4.s_addr == ip_addr.ipv4.s_addr; //Remove all ip addresses with similar s_addr from vector
             }
         ),
         ips.end()
@@ -305,7 +305,6 @@ void InterfaceManager::handle_newaddr(struct nlmsghdr *nlh) {
     const auto ifa = static_cast<struct ifaddrmsg *>(NLMSG_DATA(nlh));
     const int ifindex = ifa->ifa_index;
     const sa_family_t ifa_family = ifa->ifa_family;
-    std::cout<<"CHECK"<<std::endl;
     printf("ifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
     struct rtattr *rta = IFA_RTA(ifa);
     int rtl = IFA_PAYLOAD(nlh);
@@ -313,16 +312,15 @@ void InterfaceManager::handle_newaddr(struct nlmsghdr *nlh) {
         if (rta->rta_type == IFA_ADDRESS) {
             ip_address ipaddress = {};
             ipaddress.family = ifa_family;
-            sockaddr_in6 testip;
             char ip[ifa_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
             if (ifa_family == AF_INET) {
                 std::memcpy(&ipaddress.ipv4, RTA_DATA(rta), sizeof(struct in_addr));
                 inet_ntop(ifa_family,&ipaddress.ipv4,ip,sizeof(ip));
-                printf("Interface No.%i ip address: %s addded\n",ifindex,ip);
+                printf("Interface No.%i ip address: %s added\n",ifindex,ip);
             } else {
                 std::memcpy(&ipaddress.ipv6, RTA_DATA(rta), sizeof(struct in6_addr));
                 inet_ntop(ifa_family,&ipaddress.ipv6,ip,sizeof(ip));
-                printf("Interface No.%i ip address: %s addded\n",ifindex,ip);
+                printf("Interface No.%i ip address: %s added\n",ifindex,ip);
             }
 
             add_address(ifindex,ipaddress);
@@ -335,7 +333,6 @@ void InterfaceManager::handle_deladdr(struct nlmsghdr *nlh) {
     auto *ifa = static_cast<struct ifaddrmsg *>(NLMSG_DATA(nlh));
     const int ifindex = ifa->ifa_index;
     const sa_family_t ifa_family = ifa->ifa_family;
-    std::cout<<"CHECK"<<std::endl;
     printf("ifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
     struct rtattr *rta = IFA_RTA(ifa);
     int rtl = IFA_PAYLOAD(nlh);
@@ -371,11 +368,11 @@ ip_address InterfaceManager::get_ip_address(const ethernet_interface& interface)
             found_ipv6 = true;
         }
     }
-    //If no ip addresses return blank ip address sturct
+    //If no ip addresses return blank ip address struct
     return ipv6;
 }
 
-std::unordered_map<int, ethernet_interface> InterfaceManager::get_interface_list() {
+const std::unordered_map<int, ethernet_interface>& InterfaceManager::get_interface_list() {
     return interface_list;
 }
 

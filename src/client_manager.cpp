@@ -80,27 +80,31 @@ bool ClientManager::get_conn_status() {
 
 
 void ClientManager::write_message(cli_neighbor_payload payload) {
+    char ip[INET6_ADDRSTRLEN];
+    inet_ntop(AF_INET6,&payload.ipv6,ip,sizeof(ip));
+    printf("cli_neighbor payload sent ip_address: %s\n",ip);
     int n;
-    uint8_t buf[128];
+    uint8_t buf[sizeof(cli_neighbor_payload)];
     memcpy(buf,&payload,sizeof(payload));
 
     n = write(data_socket, buf, sizeof(buf));
     if (n == -1) {
         perror("client_manager::write_message()");
-        return;
     }
 
 }
 
 void ClientManager::end_message() {
     int n;
-    char buf[128];
-    strcpy(buf, "END");
+    const char end_mssg[] = "END";
 
-    n = write(data_socket, buf, strlen(buf) + 1);
+    n = write(data_socket, end_mssg, 3);
     if (n == -1) {
         perror("ClientManager::end_message()");
         return;
+    }
+    if (n < 3) {
+        std::cerr<<"Partial write of END mssg\n";
     }
 }
 
