@@ -3,7 +3,6 @@
 
 #include "neighbor_discovery/interface.h"
 #include <unordered_map>
-class NeighborManager;
 
 class InterfaceManager {
     public:
@@ -18,7 +17,7 @@ class InterfaceManager {
 
     private:
         std::unordered_map<int,ethernet_interface> interface_list;
-        int netlink_fd;
+        int netlink_fd = -1;
         //init steps
         int open_netlink_socket();
         bool do_getlink_dump();

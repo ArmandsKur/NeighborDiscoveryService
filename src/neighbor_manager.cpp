@@ -90,7 +90,7 @@ int NeighborManager::create_broadcast_send_socket() {
     }
     if (!socket_set_nonblock(send_sockfd)) {
         perror("set nonblock send socket");
-        close(recv_sockfd);
+        close(send_sockfd);
         return -1;
     }
     return send_sockfd;
@@ -198,9 +198,9 @@ void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_inter
 
     //Create neighbor_connection struct and fill it with information
     neighbor_connection neigh_conn{};
-    std::memcpy(&neigh_conn.neighbor_id,neighbor_pyld.client_id,sizeof(neighbor_pyld.client_id));
-    std::memcpy(&neigh_conn.mac_addr,neighbor_pyld.mac_addr,sizeof(neighbor_pyld.mac_addr));
-    neigh_conn.local_ifname = ifname;
+    std::memcpy(&neigh_conn.neighbor_id, neighbor_pyld.client_id,sizeof(neighbor_pyld.client_id));
+    std::memcpy(&neigh_conn.mac_addr, neighbor_pyld.mac_addr,sizeof(neighbor_pyld.mac_addr));
+    std::memcpy(&neigh_conn.local_ifname, ifname,IFNAMSIZ);
     neigh_conn.last_seen = rcv_time;
     if (neighbor_pyld.ip_family == AF_INET) {
         neigh_conn.ip_family = AF_INET;
@@ -216,7 +216,7 @@ void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_inter
     neighbors[neigh_conn.neighbor_id].active_connections[ifindex] = neigh_conn;
 
     //Print received neighbor info
-    std::cout<<"neigh_conn.local_ifname: "<<neigh_conn.local_ifname<<std::endl;
+    printf("neigh_conn.local_ifname: %s\n",neigh_conn.local_ifname);
     printf("neighbor_pyld.client_id: %02x:%02x:%02x:%02x:%02x:%02x\n",
              neighbor_pyld.client_id[0], neighbor_pyld.client_id[1], neighbor_pyld.client_id[2],
              neighbor_pyld.client_id[3], neighbor_pyld.client_id[4], neighbor_pyld.client_id[5]);
@@ -238,7 +238,7 @@ void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_inter
 
 cli_neighbor_payload NeighborManager::construct_cli_neighbor_payload(neighbor_connection conn) {
     cli_neighbor_payload payload{};
-    memcpy(payload.local_ifname, conn.local_ifname.data(), conn.local_ifname.size());
+    memcpy(payload.local_ifname, conn.local_ifname, IFNAMSIZ);
     memcpy(payload.client_id, conn.neighbor_id.data(), conn.neighbor_id.size());
     memcpy(payload.mac_addr, conn.mac_addr.data(), ETH_ALEN);
     //Fill IP address in case if there is any
@@ -263,14 +263,14 @@ const std::map<std::array<uint8_t, 16>, active_neighbor>& NeighborManager::get_a
     return neighbors;
 }
 
-//Erase unactive connections
-void NeighborManager::remove_unactive_connections() {
+//Erase inactive connections
+void NeighborManager::remove_inactive_connections() {
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
 
     for (auto neighbor_it = neighbors.begin(); neighbor_it != neighbors.end(); ) {
         //Get reference to neighbor_connection map
         auto& active_neigh_conn = neighbor_it->second.active_connections;
-        //Delete each which were last seen later than 30s ago
+        //Delete connections not seen in last 30 seconds
         for (auto conn_it = active_neigh_conn.begin(); conn_it != active_neigh_conn.end(); ) {
             if (now - conn_it->second.last_seen > std::chrono::seconds(30)) {
                 conn_it = active_neigh_conn.erase(conn_it);
@@ -289,11 +289,13 @@ void NeighborManager::remove_unactive_connections() {
 
 
 void NeighborManager::cleanup() {
-    if (send_sockfd > 0) {
+    if (send_sockfd != -1) {
         close(send_sockfd);
+        send_sockfd = -1;
     }
-    if (recv_sockfd > 0) {
+    if (recv_sockfd != -1) {
         close(recv_sockfd);
+        recv_sockfd = -1;
     }
 }
 

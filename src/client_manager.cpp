@@ -18,16 +18,6 @@ sockaddr_un ClientManager::init_sockaddr_un() {
 
 }
 
-void ClientManager::socket_set_nonblock(int sock_fd) {
-    int flags = fcntl(sock_fd, F_GETFL, 0);
-    if (flags == -1) {
-        perror("fcntl");
-    }
-    if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        perror("fcntl");
-    }
-}
-
 //Create an unix socket and listen on the sun_path NAME
 int ClientManager::open_listen_socket() {
     int ret;
@@ -51,8 +41,6 @@ int ClientManager::open_listen_socket() {
         return -1;
     }
 
-    //socket_set_nonblock(listen_socket);
-
     return listen_socket;
 
 }
@@ -68,7 +56,6 @@ int ClientManager::open_data_socket() {
         perror("accept");
         return -1;
     }
-    std::cout<<"Unix socket opened"<<std::endl;
     connected = true;
 
     return data_socket;
@@ -80,14 +67,7 @@ bool ClientManager::get_conn_status() {
 
 
 void ClientManager::write_message(cli_neighbor_payload payload) {
-    char ip[INET6_ADDRSTRLEN];
-    inet_ntop(AF_INET6,&payload.ipv6,ip,sizeof(ip));
-    printf("cli_neighbor payload sent ip_address: %s\n",ip);
-    int n;
-    uint8_t buf[sizeof(cli_neighbor_payload)];
-    memcpy(buf,&payload,sizeof(payload));
-
-    n = write(data_socket, buf, sizeof(buf));
+    size_t n = write(data_socket, &payload, sizeof(payload));
     if (n == -1) {
         perror("client_manager::write_message()");
     }
@@ -114,11 +94,13 @@ void ClientManager::close_data_socket() {
 }
 
 void ClientManager::cleanup() {
-    if (data_socket > 0) {
+    if (data_socket != -1) {
         close(data_socket);
+        data_socket = -1;
     }
-    if (listen_socket > 0) {
+    if (listen_socket != -1) {
         close(listen_socket);
+        listen_socket = -1;
     }
     unlink(NAME);
 }

@@ -1,10 +1,5 @@
 #ifndef NEIGHBORDISCOVERYSERVICE_NEIGHBOR_MANAGER_H
 #define NEIGHBORDISCOVERYSERVICE_NEIGHBOR_MANAGER_H
-#include <algorithm>
-#include <iostream>
-#include <vector>
-#include <sys/types.h>
-#include <ifaddrs.h>
 #include <sys/socket.h>
 #include <linux/if_packet.h>
 #include <netinet/in.h>
@@ -18,7 +13,6 @@
 #include "neighbor_discovery/interface.h"
 
 #define ETH_P_NEIGHBOR 0x88B5 //used one of the Local Experimental Ethertype
-#define P_NEIGHBOR_SIZE 53 //define the size of total payload for neighbor protocol packet
 
 #pragma pack(push, 1)
 struct neighbor_payload {
@@ -53,7 +47,7 @@ struct active_neighbor {
 struct neighbor_connection {
     std::array<uint8_t,16> neighbor_id;
     std::array<uint8_t,6> mac_addr;
-    std::string local_ifname;
+    char local_ifname[IFNAMSIZ];
     std::chrono::time_point<std::chrono::steady_clock> last_seen;
     uint8_t  ip_family;       // AF_INET / AF_INET6 / 0
     union {
@@ -76,14 +70,14 @@ class NeighborManager {
 
         const std::map<std::array<uint8_t,16>, active_neighbor>& get_active_neighbors();
 
-        void remove_unactive_connections();
+        void remove_inactive_connections();
 
         void cleanup();
     private:
         const std::array<uint8_t, 6> broadcast_mac = {0xff,0xff,0xff,0xff,0xff,0xff};
         //Socket fds
-        int send_sockfd;
-        int recv_sockfd;
+        int send_sockfd = -1;
+        int recv_sockfd = -1;
         int create_broadcast_recv_socket();
         int create_broadcast_send_socket();
 

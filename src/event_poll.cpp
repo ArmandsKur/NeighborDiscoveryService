@@ -1,5 +1,6 @@
 #include "neighbor_discovery/event_poll.h"
 #include "neighbor_discovery/interface.h"
+#include <errno.h>
 
 //Function to insert new fds to pollfd vector and store role of fd in the pfd_role map
 void EventPoll::add_to_pfds(int new_fd, short events, PollFdRole role) {
@@ -61,6 +62,8 @@ bool EventPoll::startup() {
 //Perform graceful shutdown
 void EventPoll::shutdown() {
     if_mngr.cleanup();
+    neighbor_mngr.cleanup();
+    client_mngr.cleanup();
 
 
     pfds.clear();
@@ -79,8 +82,10 @@ void EventPoll::run_event_poll(volatile const sig_atomic_t& keep_running) {
     while (fd_count > 0 && keep_running) {
 
         ready = poll(pfds.data(), fd_count, -1);
-        if (ready == -1)
+        if (ready == -1) {
             perror("poll");
+            break;
+        }
 
         for (const pollfd& pfd : pfds) {
             if (pfd.revents == 0) {
@@ -128,16 +133,17 @@ void EventPoll::run_event_poll(volatile const sig_atomic_t& keep_running) {
                 if (client_mngr.get_conn_status())
                     continue;
 
-                /*Remove unactive connections just before outputting to CLI
+                /*Remove inactive connections just before outputting to CLI
                 * On 10K+ neighbours iterating trough each element becomes more painful
                 * And because most of the time you won't delete anything
                 * It's better to do it not often
                 */
-                neighbor_mngr.remove_unactive_connections();
+                neighbor_mngr.remove_inactive_connections();
 
                 int unix_fd = client_mngr.open_data_socket();
                 if (unix_fd == -1) {
                     std::cerr<<"Failed to open data socket\n";
+                    continue;
                 }
 
                 for (const auto& neighbor: neighbor_mngr.get_active_neighbors()) {

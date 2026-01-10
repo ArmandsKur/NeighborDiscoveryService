@@ -85,7 +85,7 @@ bool InterfaceManager::do_getlink_dump() {
             perror("recv");
             return false;
         }
-        for (auto* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+        for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_seq != getlink_dump_seq)
                 continue;
             if (nlh->nlmsg_type == NLMSG_DONE) {
@@ -136,7 +136,7 @@ bool InterfaceManager::do_getaddr_dump() {
             perror("recv");
             return false;
         }
-        for (auto nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+        for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_seq != getaddr_dump_seq)
                 continue;
             if (nlh->nlmsg_type == NLMSG_DONE) {
@@ -191,7 +191,7 @@ void InterfaceManager::handle_netlink_event() {
     if (sa.nl_pid != 0)
         return;
 
-    for (auto nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
+    for (nlmsghdr* nlh = (struct nlmsghdr*)buffer;NLMSG_OK(nlh, len);nlh = NLMSG_NEXT(nlh, len)) {
         if (nlh->nlmsg_type == NLMSG_DONE) {
             break;
         }
@@ -359,7 +359,7 @@ void InterfaceManager::handle_deladdr(struct nlmsghdr *nlh) {
 ip_address InterfaceManager::get_ip_address(const ethernet_interface& interface) {
     ip_address ipv6{};
     bool found_ipv6 = false;
-    for (auto& ip_addr:interface.ip_addresses) {
+    for (const auto& ip_addr:interface.ip_addresses) {
         if (ip_addr.family == AF_INET) {
             return ip_addr;
         }
@@ -377,8 +377,9 @@ const std::unordered_map<int, ethernet_interface>& InterfaceManager::get_interfa
 }
 
 void InterfaceManager::cleanup() {
-    if (netlink_fd > 0) {
+    if (netlink_fd != -1) {
         close(netlink_fd);
+        netlink_fd = -1;
     }
 }
 

@@ -6,9 +6,8 @@
 static volatile sig_atomic_t keep_running = 1;
 // Signal handler function
 void signalHandler(int sig) {
-    std::cout << "\nShutdown signal recieved. Signal: " << sig << std::endl;
+    (void)sig;
     keep_running = 0;
-    //exit(sig);
 }
 /*
  * NeighborDiscovery service must be ran with root privileges
