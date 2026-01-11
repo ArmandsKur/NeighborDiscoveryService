@@ -112,7 +112,7 @@ bool InterfaceManager::do_getlink_dump() {
                 return false;
             }
             if (nlh->nlmsg_type == RTM_NEWLINK) {
-                std::cout<<"RTM_NEWLINK"<<std::endl;
+                std::cout<<"RTM_NEWLINK\n";
                 handle_newlink(nlh);
             }
 
@@ -163,7 +163,7 @@ bool InterfaceManager::do_getaddr_dump() {
                 return false;
             }
             if (nlh->nlmsg_type == RTM_NEWADDR) {
-                std::cout<<"RTM_NEWADDR"<<std::endl;
+                std::cout<<"RTM_NEWADDR\n";
                 handle_newaddr(nlh);
             }
 
@@ -218,19 +218,19 @@ void InterfaceManager::handle_netlink_event() {
 
         switch (nlh->nlmsg_type) {
             case RTM_NEWLINK:
-                std::cout << "RTM_NEWLINK" << std::endl;
+                std::cout << "RTM_NEWLINK\n";
                 handle_newlink(nlh);
                 break;
             case RTM_DELLINK:
-                std::cout << "RTM_DELLINK" << std::endl;
+                std::cout << "RTM_DELLINK\n";
                 handle_dellink(nlh);
                 break;
             case RTM_NEWADDR:
-                std::cout << "RTM_NEWADDR" << std::endl;
+                std::cout << "RTM_NEWADDR\n";
                 handle_newaddr(nlh);
                 break;
             case RTM_DELADDR:
-                std::cout << "RTM_DELADDR" << std::endl;
+                std::cout << "RTM_DELADDR\n";
                 handle_deladdr(nlh);
                 break;
         }
@@ -260,7 +260,7 @@ void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
             auto ifname = static_cast<char *>((RTA_DATA(rta)));
             interface_list[ifindex].ifname = ifname;
             printf(
-                "ifname: %s, status: %s, i_running: %s, ifindex: %i\n",
+                "\tifname: %s, status: %s, i_running: %s, ifindex: %i\n",
                 ifname,
                 if_up ? "up" : "down",
                 if_running ? "running" : "stopped",
@@ -272,7 +272,7 @@ void InterfaceManager::handle_newlink(struct nlmsghdr *nlh) {
             auto mac_addr = static_cast<uint8_t *>(RTA_DATA(rta));
             std::memcpy(interface_list[ifindex].mac_addr.data(), RTA_DATA(rta), 6);
 
-            printf("MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+            printf("\tMAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
                 mac_addr[0], mac_addr[1], mac_addr[2],
                 mac_addr[3], mac_addr[4], mac_addr[5]
             );
@@ -291,7 +291,7 @@ void InterfaceManager::handle_dellink(struct nlmsghdr *nlh) {
 
     int ifindex = ifi->ifi_index;
     interface_list.erase(ifindex);
-    printf("interface No.%i deleted\n", ifindex);
+    printf("\tinterface No.%i deleted\n", ifindex);
 }
 
 void InterfaceManager::add_address(int ifindex, ip_address ip_addr) {
@@ -320,7 +320,7 @@ void InterfaceManager::handle_newaddr(struct nlmsghdr *nlh) {
     const auto ifa = static_cast<struct ifaddrmsg *>(NLMSG_DATA(nlh));
     const int ifindex = ifa->ifa_index;
     const sa_family_t ifa_family = ifa->ifa_family;
-    printf("ifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
+    printf("\tifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
     struct rtattr *rta = IFA_RTA(ifa);
     int rtl = IFA_PAYLOAD(nlh);
     while (RTA_OK(rta, rtl)) {
@@ -331,11 +331,11 @@ void InterfaceManager::handle_newaddr(struct nlmsghdr *nlh) {
             if (ifa_family == AF_INET) {
                 std::memcpy(&ipaddress.ipv4, RTA_DATA(rta), sizeof(struct in_addr));
                 inet_ntop(ifa_family,&ipaddress.ipv4,ip,sizeof(ip));
-                printf("Interface No.%i ip address: %s added\n",ifindex,ip);
+                printf("\tInterface No.%i ip address: %s added\n",ifindex,ip);
             } else {
                 std::memcpy(&ipaddress.ipv6, RTA_DATA(rta), sizeof(struct in6_addr));
                 inet_ntop(ifa_family,&ipaddress.ipv6,ip,sizeof(ip));
-                printf("Interface No.%i ip address: %s added\n",ifindex,ip);
+                printf("\tInterface No.%i ip address: %s added\n",ifindex,ip);
             }
 
             add_address(ifindex,ipaddress);
@@ -348,7 +348,7 @@ void InterfaceManager::handle_deladdr(struct nlmsghdr *nlh) {
     auto *ifa = static_cast<struct ifaddrmsg *>(NLMSG_DATA(nlh));
     const int ifindex = ifa->ifa_index;
     const sa_family_t ifa_family = ifa->ifa_family;
-    printf("ifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
+    printf("\tifa_family: %i, ifindex: %i\n", ifa_family, ifindex);
     struct rtattr *rta = IFA_RTA(ifa);
     int rtl = IFA_PAYLOAD(nlh);
     while (RTA_OK(rta, rtl)) {
@@ -364,7 +364,7 @@ void InterfaceManager::handle_deladdr(struct nlmsghdr *nlh) {
 
             char ip[ifa_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
             inet_ntop(ifa_family,RTA_DATA(rta),ip,sizeof(ip));
-            printf("Interface No.%i ip address: %s deleted\n",ifindex,ip);
+            printf("\tInterface No.%i ip address: %s deleted\n",ifindex,ip);
         }
         rta = RTA_NEXT(rta, rtl);
     }

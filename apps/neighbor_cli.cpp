@@ -71,19 +71,19 @@ int main() {
             conn_num = 1;
         }
 
-        printf("%d. ",conn_num);
+        printf("\t%d. ",conn_num);
         printf("ifname: %s, ", neighbor_pyld.local_ifname);
-        printf("neighbor_pyld.mac_addr: %02x:%02x:%02x:%02x:%02x:%02x, ",
+        printf("MAC address: %02x:%02x:%02x:%02x:%02x:%02x, ",
                  neighbor_pyld.mac_addr[0], neighbor_pyld.mac_addr[1], neighbor_pyld.mac_addr[2],
                  neighbor_pyld.mac_addr[3], neighbor_pyld.mac_addr[4], neighbor_pyld.mac_addr[5]);
 
         char ip[neighbor_pyld.ip_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
         if (neighbor_pyld.ip_family == AF_INET) {
             inet_ntop(AF_INET,&neighbor_pyld.ipv4,ip,sizeof(ip));
-            printf("ip_address: %s\n",ip);
+            printf("IP address: %s\n",ip);
         } else if (neighbor_pyld.ip_family == AF_INET6) {
             inet_ntop(AF_INET6,&neighbor_pyld.ipv6,ip,sizeof(ip));
-            printf("ip_address: %s\n",ip);
+            printf("IP address: %s\n",ip);
         } else {
             printf("ip_address: None\n");
         }

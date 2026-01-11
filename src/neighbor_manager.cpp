@@ -220,26 +220,6 @@ void NeighborManager::recv_broadcast(const std::unordered_map<int,ethernet_inter
 
     //store the connection
     neighbors[neigh_conn.neighbor_id].active_connections[ifindex] = neigh_conn;
-
-    //Print received neighbor info
-    printf("neigh_conn.local_ifname: %s\n",neigh_conn.local_ifname);
-    printf("neighbor_pyld.client_id: %02x:%02x:%02x:%02x:%02x:%02x\n",
-             neighbor_pyld.client_id[0], neighbor_pyld.client_id[1], neighbor_pyld.client_id[2],
-             neighbor_pyld.client_id[3], neighbor_pyld.client_id[4], neighbor_pyld.client_id[5]);
-
-    printf("neighbor_pyld.mac_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
-             neighbor_pyld.mac_addr[0], neighbor_pyld.mac_addr[1], neighbor_pyld.mac_addr[2],
-             neighbor_pyld.mac_addr[3], neighbor_pyld.mac_addr[4], neighbor_pyld.mac_addr[5]);
-
-
-    char ip[neigh_conn.ip_family == AF_INET6?INET6_ADDRSTRLEN:INET_ADDRSTRLEN];
-    if (neigh_conn.ip_family == AF_INET) {
-        inet_ntop(AF_INET,&neigh_conn.ipv4,ip,sizeof(ip));
-        printf("ip_address: %s\n",ip);
-    } else if (neigh_conn.ip_family == AF_INET6) {
-        inet_ntop(AF_INET6,&neigh_conn.ipv6,ip,sizeof(ip));
-        printf("ip_address: %s\n",ip);
-    }
 }
 
 cli_neighbor_payload NeighborManager::construct_cli_neighbor_payload(neighbor_connection conn) {
