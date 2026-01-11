@@ -2,6 +2,7 @@
 #define NEIGHBORDISCOVERYSERVICE_NEIGHBOR_MANAGER_H
 #include <sys/socket.h>
 #include <linux/if_packet.h>
+#include <linux/if_ether.h>
 #include <netinet/in.h>
 #include <net/if.h>
 #include <chrono>

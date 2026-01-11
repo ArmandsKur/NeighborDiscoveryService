@@ -2,6 +2,7 @@
 #define NEIGHBORDISCOVERYSERVICE_EVENT_POLL_H
 #include <vector>
 #include <signal.h>
+#include <poll.h>
 
 #include "neighbor_discovery/neighbor_manager.h"
 #include "neighbor_discovery/interface_manager.h"

@@ -1,8 +1,13 @@
 #ifndef NEIGHBORDISCOVERYSERVICE_INTERFACE_MANAGER_H
 #define NEIGHBORDISCOVERYSERVICE_INTERFACE_MANAGER_H
 
-#include "neighbor_discovery/interface.h"
+
 #include <unordered_map>
+#include <linux/netlink.h>
+
+#include "neighbor_discovery/interface.h"
+
+
 
 class InterfaceManager {
     public:
@@ -27,7 +32,7 @@ class InterfaceManager {
         void handle_newlink(nlmsghdr* nlh);
         void handle_dellink(nlmsghdr* nlh);
         void handle_newaddr(nlmsghdr* nlh);
-        void handle_deladdr(nlmsghdr* nlh);
+        void handle_deladdr(struct nlmsghdr* nlh);
         void add_address(int ifindex, ip_address);
         void del_address(int ifindex, ip_address);
 

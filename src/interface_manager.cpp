@@ -1,5 +1,20 @@
+#include <algorithm>
+#include <cstring>
+#include <iostream>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/socket.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <net/if.h>
+
 #include "neighbor_discovery/interface.h"
 #include "neighbor_discovery/interface_manager.h"
+
+
+
 
 bool InterfaceManager::init() {
     netlink_fd = open_netlink_socket();

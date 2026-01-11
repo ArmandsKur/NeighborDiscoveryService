@@ -1,6 +1,10 @@
+#include <errno.h>
+#include <poll.h>
+#include <algorithm>
+
 #include "neighbor_discovery/event_poll.h"
 #include "neighbor_discovery/interface.h"
-#include <errno.h>
+
 
 //Function to insert new fds to pollfd vector and store role of fd in the pfd_role map
 void EventPoll::add_to_pfds(int new_fd, short events, PollFdRole role) {

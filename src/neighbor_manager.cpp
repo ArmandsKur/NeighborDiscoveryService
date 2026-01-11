@@ -1,3 +1,9 @@
+#include <cstring>
+#include <unistd.h>
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <linux/if_ether.h>
+
 #include "neighbor_discovery/neighbor_manager.h"
 
 bool NeighborManager::init() {

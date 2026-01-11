@@ -1,5 +1,7 @@
 #include "neighbor_discovery/client_manager.h"
 
+#include <unistd.h>
+
 bool ClientManager::init() {
     if (open_listen_socket() == -1) {
         std::cerr << "Failed to open unix listen socket\n";

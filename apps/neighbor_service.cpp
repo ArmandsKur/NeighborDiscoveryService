@@ -15,7 +15,6 @@ void signalHandler(int sig) {
  */
 int main() {
     // Handle signal
-
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
     EventPoll event_poll;
