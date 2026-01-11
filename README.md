@@ -1,12 +1,10 @@
 # NeighborDiscoveryService
-A nighbor discovery service that uses custom L2 protocol to detect and track neighbors across multiple separate local networks.
+A neighbor discovery service that uses custom L2 protocol to detect and track neighbors across multiple separate local networks.
 
 ## Overview
-**NeigborDiscoveryService** is background service that broadcasts presence information and listens for broadcasts from other neighbors across local network. It supports multiple network intefracs, both IPv4/IPv6 addresses or interfaces without IP address, and provides real-time updates as interface state changes.
+**NeigborDiscoveryService** is background service that broadcasts presence information and listens for broadcasts from other neighbors across local network. It supports multiple network interfaces, both IPv4/IPv6 addresses or interfaces without IP address, and provides real-time updates as interface state changes.
 
 **NeighborCli** is command-line client that queries the service and displays all neighbors seen within last 30 seconds.
-## Features
-- Multi-interface support 
 
 ## Architecture
 ### Components
@@ -26,3 +24,29 @@ EthernetFrame:
  - ip_family: 1 byte (AF_INET/AF_INET6/0)
  - union of in_addr and in6_addr: 16 bytes
 ```
+### Key design decisions
+
+## Testing
+### Test environment
+- VM Manager: UTM
+- Setup: 3 VMs, 2 networks
+  - VM1: Connected to both networks (using interfaces enp0s1 and enp0s2)
+  - VM2: Connected to both networks (using interfaces enp0s1 and enp0s2)
+  - VM3: Connected to one network only (using enp0s1)
+
+### Tests performed
+#### Test1:Standard operation
+**Setup:** All 3 VMs running with all IP addresses on all interfaces.  
+**Result:** CLI correctly shows neighbor connections on appropriate local interfaces.
+#### Test2: IP address flush
+**Setup:** Started with all IPs assigned, then flushed all IPs from enp0s2 on VM1.  
+**Result:**
+- Service does not get disrupted, broadcasts still sent and received using enp0s2.
+- VM2 still sees this connection but IP is marked as None.
+#### Test3: Interface UP/DOWN events
+**Setup:** During standard service run disabled enp0s1 interface on VM2.
+**Result:**
+- Neighbors continue to show VM2 for 30 seconds.
+- After 30s VM1 shows only enp0s2 connection to VM2.
+- VM3 loses track of VM2 entirely (it's only interface is enp0s1).
+- Starting up the interface on VM2 immediately restores discovery.
