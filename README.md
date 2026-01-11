@@ -67,10 +67,10 @@ EthernetFrame:
 - After 30s VM1 shows only enp0s2 connection to VM2.
 - VM3 loses track of VM2 entirely (it's only interface is enp0s1).
 - Starting up the interface on VM2 immediately restores discovery.
-#### Test: Starting service with disabled interface
+#### Test4: Starting service with disabled interface
 **Setup:** Service starts with any interface disabled.  
 **Result:** Netlink events trigger immediate broadcast sending/receiving on newly enabled interfaces
-#### Test: IPv4 priority
+#### Test5: IPv4 priority
 **Setup:** VM2 starts with enp0s2 interface having both IPv4 and IPv6. Interface IPv4 gets disabled and enabled, right after each activity CLI is run.  
 **Result:** At start for enp0s2 IPv4 is displayed. After IPv4 is disabled IPv6 is displayed instead. When IPv4 is re-enabled, IPv4 again starts showing instead of IPv6.
 
