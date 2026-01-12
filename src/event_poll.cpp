@@ -35,6 +35,20 @@ void EventPoll::del_from_pfds(int fd) {
     //erase fd from unordered map
     pfd_role.erase(fd);
 }
+
+void EventPoll::sent_broadcasts() {
+    //Send broadcast message trough each active interface
+    for (auto& it: if_mngr.get_interface_list()) {
+        auto interface = it.second;
+        if (interface.is_active && !interface.is_loopback) {
+            neighbor_payload payload = neighbor_mngr.construct_neighbor_payload(
+                interface.mac_addr,
+                if_mngr.get_ip_address(interface)
+            );
+            neighbor_mngr.send_broadcast(interface.ifindex,interface.mac_addr,payload);
+        }
+    }
+}
 //Function used to initialize all managers used in event poll
 bool EventPoll::startup() {
     //init interface manager
@@ -50,7 +64,6 @@ bool EventPoll::startup() {
         return false;
     }
     add_to_pfds(neighbor_mngr.get_broadcast_recv_socket(), POLLIN, PollFdRole::PacketRecv);
-    add_to_pfds(neighbor_mngr.get_broadcast_send_socket(), POLLOUT, PollFdRole::PacketSend);
 
     //init client manager
     if (!client_mngr.init()) {
@@ -78,17 +91,31 @@ void EventPoll::shutdown() {
 
 //Function used to run main event poll which will handle all the activities
 void EventPoll::run_event_poll(volatile const sig_atomic_t& keep_running) {
-    int ready;
-    //Init time_point variables
+    int ready,timeout_ms;
+    //Init time_point last_packet time.
     std::chrono::time_point<std::chrono::steady_clock> last_packet_time{};
-    std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
 
     while (fd_count > 0 && keep_running) {
 
-        ready = poll(pfds.data(), fd_count, -1);
+        //Update the timeout variable, which is used to select the blocking time for poll
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_packet_time).count();
+        if (elapsed_ms >= 5000) {
+            timeout_ms = 0;
+        } else {
+            timeout_ms = 5000 - elapsed_ms;
+        }
+
+        ready = poll(pfds.data(), fd_count, timeout_ms);
         if (ready == -1) {
             perror("poll");
             break;
+        }
+
+        //When timeout is met send broadcast
+        if (timeout_ms <= 0) {
+            sent_broadcasts();
+            last_packet_time = std::chrono::steady_clock::now();
         }
 
         for (const pollfd& pfd : pfds) {
@@ -109,25 +136,6 @@ void EventPoll::run_event_poll(volatile const sig_atomic_t& keep_running) {
                 if (pfd.revents & POLLIN) {
                     neighbor_mngr.recv_broadcast(if_mngr.get_interface_list());
                 }
-            } else if (pfd_role[pfd.fd] == PollFdRole::PacketSend) {
-                if (pfd.revents & POLLOUT) {
-                    now = std::chrono::steady_clock::now();
-                    //Send broadcast only each 5 seconds
-                    if (now - last_packet_time >= std::chrono::seconds(5)) {
-                        //Send broadcast message trough each active interface
-                        for (auto& it: if_mngr.get_interface_list()) {
-                            auto interface = it.second;
-                            if (interface.is_active && !interface.is_loopback) {
-                                neighbor_payload payload = neighbor_mngr.construct_neighbor_payload(
-                                    interface.mac_addr,
-                                    if_mngr.get_ip_address(interface)
-                                );
-                                neighbor_mngr.send_broadcast(interface.ifindex,interface.mac_addr,payload);
-                            }
-                        }
-                        last_packet_time = now;
-                    }
-                }
             } else if (pfd_role[pfd.fd] == PollFdRole::UnixListen) {
                 /*
                  * Process clients one by one
@@ -137,7 +145,8 @@ void EventPoll::run_event_poll(volatile const sig_atomic_t& keep_running) {
                 if (client_mngr.get_conn_status())
                     continue;
 
-                /*Remove inactive connections just before outputting to CLI
+                /*
+                * Remove inactive connections just before outputting to CLI
                 * On 10K+ neighbours iterating trough each element becomes more painful
                 * And because most of the time you won't delete anything
                 * It's better to do it not often

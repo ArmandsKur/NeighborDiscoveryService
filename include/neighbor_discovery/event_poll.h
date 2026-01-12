@@ -19,6 +19,7 @@ class EventPoll{
     public:
         bool startup();
         void shutdown();
+        void sent_broadcasts();
         void run_event_poll(volatile const sig_atomic_t& keep_running);
 
         void add_to_pfds(int new_fd, short events, PollFdRole role);
