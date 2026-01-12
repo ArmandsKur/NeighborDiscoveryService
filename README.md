@@ -5,7 +5,7 @@ A neighbor discovery service that uses custom L2 protocol to detect and track ne
 ```
 # clone the repo
 git clone https://github.com/ArmandsKur/NeighborDiscoveryService.git
-# go to creadted repo dir
+# go to created repo dir
 cd NeighborDiscoveryService
 # create and open 'build' directory
 mkdir build && cd build
@@ -28,7 +28,7 @@ make
 ### Components
 1. EventPoll: Main event loop using poll() to orchestrate all socket I/O.
 2. InterfaceManager: Netlink-based interface monitoring.
-3. NeighborManage: Custom Ethernet protocol implementation for neighbor discovery.
+3. NeighborManager: Custom Ethernet protocol implementation for neighbor discovery.
 4. ClientManager: Unix domain socket server for CLI communication.
 
 ### Protocol design
@@ -65,7 +65,7 @@ EthernetFrame:
 **Result:**
 - Neighbors continue to show VM2 for 30 seconds.
 - After 30s VM1 shows only enp0s2 connection to VM2.
-- VM3 loses track of VM2 entirely (it's only interface is enp0s1).
+- VM3 loses track of VM2 entirely (its only interface is enp0s1).
 - Starting up the interface on VM2 immediately restores discovery.
 #### Test4: Starting service with disabled interface
 **Setup:** Service starts with any interface disabled.  
